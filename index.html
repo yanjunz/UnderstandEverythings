@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="浏览和搜索理解万物的所有原理主题。">
+  <title>理解万物 · 主题目录</title>
+  <script defer src="assets/catalog.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f6f7fb;
+      --paper: #fff;
+      --ink: #171e39;
+      --muted: #4f5872;
+      --line: #dce1ef;
+      --accent: #3049e4;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--ink);
+      font: 1rem/1.7 system-ui, "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    }
+
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+
+    .frame {
+      width: min(66rem, calc(100% - 2rem));
+      margin-inline: auto;
+    }
+
+    .site-header {
+      padding-block: 1rem;
+      border-bottom: 1px solid var(--line);
+      background: var(--paper);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: .65rem;
+      font-weight: 750;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 1.85rem;
+      height: 1.85rem;
+      border-radius: .45rem;
+      background: var(--accent);
+      color: white;
+      font-size: .95rem;
+    }
+
+    .intro {
+      padding: clamp(2.5rem, 7vw, 5rem) 0 clamp(2rem, 5vw, 3.5rem);
+      border-bottom: 1px solid var(--line);
+      background: radial-gradient(#7383ca24 1px, transparent 1px) top right / 19px 19px, #eef1fa;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2.55rem, 7vw, 4.5rem);
+      line-height: 1.1;
+      letter-spacing: -.055em;
+    }
+
+    .intro p { margin: .85rem 0 0; color: var(--muted); }
+    .search-form { max-width: 46rem; margin-top: 1.6rem; }
+    .search-form label { display: block; margin-bottom: .4rem; font-size: .875rem; font-weight: 700; }
+
+    .search-field {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding-inline: .95rem .5rem;
+      border: 1px solid #a6b0ce;
+      border-radius: .75rem;
+      background: var(--paper);
+    }
+
+    .search-field:focus-within {
+      border-color: var(--accent);
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .search-icon {
+      position: relative;
+      flex: 0 0 .9rem;
+      height: .9rem;
+      border: 2px solid #596681;
+      border-radius: 50%;
+    }
+
+    .search-icon::after {
+      position: absolute;
+      right: -.32rem;
+      bottom: -.17rem;
+      width: .38rem;
+      height: 2px;
+      transform: rotate(45deg);
+      border-radius: 2px;
+      background: #596681;
+      content: "";
+    }
+
+    .search-field input {
+      flex: 1;
+      min-width: 0;
+      min-height: 3.25rem;
+      padding: .6rem .15rem;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    .search-field input::placeholder { color: var(--muted); }
+    .search-field input::-webkit-search-cancel-button { display: none; }
+    .search-field input:focus-visible { outline: none; }
+
+    .clear-search {
+      min-height: 2.5rem;
+      padding: .35rem .65rem;
+      border: 0;
+      border-radius: .4rem;
+      background: #edf0ff;
+      color: #263ac0;
+      font: 650 .875rem/1.5 system-ui, sans-serif;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .clear-search:hover { background: #e2e7ff; }
+    .catalog { padding-block: clamp(2rem, 5vw, 3.5rem); }
+
+    .catalog-heading {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: .15rem 1rem;
+      margin-bottom: .95rem;
+    }
+
+    .catalog-heading h2 { margin: 0; font-size: clamp(1.35rem, 3vw, 1.75rem); }
+    .catalog-heading p { margin: 0; color: var(--muted); font-size: .875rem; }
+    .topic-list { margin: 0; padding: 0; list-style: none; }
+    .topic-list > li + li { margin-top: .75rem; }
+
+    .topic {
+      position: relative;
+      display: block;
+      padding: clamp(1.25rem, 4vw, 2.25rem);
+      padding-right: clamp(3.5rem, 9vw, 6rem);
+      border: 1px solid var(--line);
+      border-radius: .85rem;
+      background: var(--paper);
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .topic:hover { border-color: var(--accent); }
+    .topic h3 { margin: 0; font-size: clamp(1.25rem, 4vw, 1.8rem); }
+    .topic p { margin: .45rem 0 0; color: var(--muted); }
+
+    .topic-arrow {
+      position: absolute;
+      top: 50%;
+      right: clamp(1.25rem, 4vw, 2.25rem);
+      transform: translateY(-50%);
+      color: var(--accent);
+      font-size: 1.5rem;
+    }
+
+    .empty-state {
+      margin: 0;
+      padding: 1.25rem;
+      border: 1px dashed #a6b0ce;
+      border-radius: .85rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="frame">
+      <span class="brand"><span class="brand-mark" aria-hidden="true">理</span> 理解万物</span>
+    </div>
+  </header>
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <div class="frame">
+        <h1 id="page-title">主题目录</h1>
+        <p>从一个具体问题出发，理解一项原理。</p>
+        <form class="search-form" id="topic-search" role="search" hidden>
+          <label for="query">搜索主题</label>
+          <div class="search-field">
+            <span class="search-icon" aria-hidden="true"></span>
+            <input id="query" name="q" type="search" placeholder="例如 DeepSeek、工具调用" aria-controls="topic-list">
+            <button class="clear-search" id="clear-search" type="reset" hidden>清除</button>
+          </div>
+        </form>
+      </div>
+    </section>
+    <section class="frame catalog" aria-labelledby="topics-title">
+      <div class="catalog-heading">
+        <h2 id="topics-title">全部主题</h2>
+        <p id="result-count" role="status"></p>
+      </div>
+      <p class="empty-state" id="no-results" hidden>没有找到匹配的主题。试试更短的关键词，或清除搜索查看全部主题。</p>
+      <ul class="topic-list" id="topic-list" role="list">
+        <li data-keywords="dsh DeepSeekHarness 深度求索 Agent 智能体工程 天气查询">
+          <a class="topic" href="topics/deepseek-harness/">
+            <h3>DeepSeek Harness 原理</h3>
+            <p>跟着一次工具调用，理解模型、智能体循环和会话日志如何配合。</p>
+            <span class="topic-arrow" aria-hidden="true">→</span>
+          </a>
+        </li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
