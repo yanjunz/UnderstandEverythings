@@ -11,6 +11,7 @@ function activatePerspective(selectedIndex) {
     tab.tabIndex = selected ? 0 : -1;
     perspectivePanels[index].hidden = !selected;
   });
+  perspectiveList.dispatchEvent(new Event("perspectivechange"));
 }
 
 function perspectiveFromLocation() {
