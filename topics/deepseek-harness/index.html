@@ -6,6 +6,7 @@
   <meta name="description" content="从一次天气查询理解 DeepSeek Harness 的智能体循环、工具插件和会话日志。">
   <title>DeepSeek Harness 原理 · 理解万物</title>
   <link rel="stylesheet" href="assets/topic.css">
+  <script defer src="assets/perspectives.js"></script>
   <script defer src="assets/demo.js"></script>
 </head>
 <body>
@@ -17,8 +18,8 @@
         理解万物
       </a>
       <nav aria-label="页内导航">
+        <a href="#perspectives">讲解视角</a>
         <a href="#demo">交互演示</a>
-        <a href="#architecture">核心机制</a>
         <a href="#references">参考资料</a>
       </nav>
     </div>
@@ -29,8 +30,8 @@
       <div class="hero-copy">
         <p class="eyebrow">智能体工程</p>
         <h1 id="page-title">DeepSeek<br><span>Harness 原理</span></h1>
-        <p class="hero-lead">模型提出工具调用，谁来真正执行？DeepSeek Harness（<code>dsh</code>）是 DeepSeek 开源的智能体运行时，负责组装模型上下文、调度工具，并把执行结果带入下一次推理。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></p>
-        <a class="primary-action" href="#demo">开始交互演示 <span aria-hidden="true">↓</span></a>
+        <p class="hero-lead">你问「北京现在的天气怎么样？」，模型怎么拿到最新数据？DeepSeek Harness（<code>dsh</code>）是 DeepSeek 开源的智能体运行时，负责把模型、工具和它们交换的信息接起来。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></p>
+        <a class="primary-action" href="#perspectives">选择讲解视角 <span aria-hidden="true">↓</span></a>
       </div>
 
       <figure class="flow">
@@ -57,6 +58,82 @@
           </div>
         </div>
       </figure>
+    </section>
+
+    <section id="perspectives" class="frame perspective-section" aria-labelledby="perspectives-title">
+      <h2 id="perspectives-title">两种讲解视角</h2>
+      <div class="perspective-choices" data-perspective-tabs aria-labelledby="perspectives-title">
+        <a id="beginner-tab" href="#beginner">
+          <strong>初学者</strong>
+          <span>跟着天气查询理解工具调用</span>
+        </a>
+        <a id="architect-tab" href="#architecture">
+          <strong>架构师</strong>
+          <span>追踪组件边界、事件与失败处理</span>
+        </a>
+      </div>
+
+      <section id="beginner" class="perspective-panel" aria-labelledby="beginner-title">
+        <h3 id="beginner-title">从一个天气问题到一条答复</h3>
+        <p class="section-intro">Harness 是运行模型和工具的程序。工具可以是一个查天气的小程序。模型提出需要查哪个城市，Harness 负责调用小程序，并把查到的数据交回模型。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></p>
+        <ol class="beginner-steps">
+          <li><strong>让模型知道能查什么</strong><span>你问北京现在的天气。Harness 把问题连同天气工具的用途和必填参数一起发给模型。</span></li>
+          <li><strong>把「请查北京」变成实际查询</strong><span>模型提交天气工具和城市名。Harness 检查这次请求，再执行天气工具。</span></li>
+          <li><strong>把查到的数据变成回答</strong><span>假设工具返回「晴、22°C」，Harness 把结果发回模型。模型读到数据后，组织成一句你能直接读懂的答复。</span></li>
+        </ol>
+        <div class="plugin-note">
+          <h4>工具超时，或者根本用不到工具</h4>
+          <p>天气查询超时时，演示中的模型会说明暂时无法确认。像「摄氏度怎样换算成华氏度」这样的问题，模型可以直接用公式回答。此时通常一次调用模型就够了。</p>
+        </div>
+        <a class="perspective-demo-link" href="#demo">试试交互演示 ↓</a>
+      </section>
+
+      <section id="architecture" class="perspective-panel" aria-labelledby="architecture-title">
+        <h3 id="architecture-title">组件如何协作，状态在哪里流转</h3>
+        <p class="section-intro">以下以 dsh 的默认 <code>agent-loop</code> 为范围。<strong>Turn（回合）</strong>覆盖一次任务处理，可以推进多个 <strong>Step（步骤）</strong>。正常路径中的每个步骤都包含一次模型请求，模型也可以在这次请求中提出一批工具调用。示例假设模型支持工具调用，天气工具已在当前作用域注册。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></p>
+        <div class="mechanism-grid">
+          <article class="mechanism">
+            <p class="package-name">core/agent-loop</p>
+            <h4>请求组装与模型适配</h4>
+            <p>循环用系统提示、会话投影和可用工具的声明组装模型请求。<code>ctx.llm</code> 上注册的适配器负责与选定的模型提供方通信，将返回内容交给循环处理。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></p>
+          </article>
+          <article class="mechanism">
+            <p class="package-name">core/tools</p>
+            <h4>作用域内的工具执行</h4>
+            <p>循环把原始调用批次交给 <code>ctx.tools.execute()</code>。执行器按智能体的作用域选择工具，处理参数、执行前决策与执行后的结果。调用标识贯穿 <code>tool/call</code> 和 <code>tool/result</code>。<sup><a href="#ref-tools" aria-label="来源 2">[2]</a></sup></p>
+          </article>
+          <article class="mechanism">
+            <p class="package-name">core/session</p>
+            <h4>会话事件与消息投影</h4>
+            <p>循环将消息、调用和结果追加到会话日志，再从日志推导下一次请求的消息历史。流式回复的增量可供实时界面使用，完成的消息与失败尝试按各自的事件写入日志。<sup><a href="#ref-session" aria-label="来源 3">[3]</a></sup><sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></p>
+          </article>
+        </div>
+
+        <div class="trace-example">
+          <h4>天气查询的事件轨迹</h4>
+          <p>这是一个工具成功、模型在第二次请求后完成回合的简化轨迹。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></p>
+          <pre><code>turn/start
+  step/start → 模型请求 → assistant/message
+    tool/call → 查天气 → tool/result
+  step/end
+  step/start → 带工具结果再次请求模型 → assistant/message
+  step/end
+turn/end</code></pre>
+        </div>
+
+        <div id="limits" class="architecture-notes">
+          <h4>失败分支与设计取舍</h4>
+          <dl>
+            <dt>工具失败如何传递</dt>
+            <dd>执行前策略可以拒绝、取消或要求审批。执行包装器可以施加超时限制；例如天气工具超时后，错误结果会与原调用关联。循环可以把模型可见的错误信息带入下一步。<sup><a href="#ref-tools" aria-label="来源 2">[2]</a></sup></dd>
+            <dt>回合何时结束</dt>
+            <dd>如果结果需要模型继续处理，或有新的待处理输入，循环可以再跑一步。准备结束时还会经过 <code>agent/turn-stopping</code> 检查。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></dd>
+            <dt>可替换的部件带来什么约束</dt>
+            <dd>Cordis 允许通过插件注册模型适配器、工具、日志和循环。对集成者而言，替换组件时仍需对齐工具可见范围、结果格式与日志语义。会话可从日志重建消息历史，外部工具副作用的重试与补偿需要由工具和集成方案处理。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup><sup><a href="#ref-session" aria-label="来源 3">[3]</a></sup></dd>
+          </dl>
+        </div>
+        <a class="perspective-demo-link" href="#demo">在演示中查看输入和输出 ↓</a>
+      </section>
     </section>
 
     <section id="demo" class="demo-section" aria-labelledby="demo-title">
@@ -114,44 +191,7 @@
       </div>
     </section>
 
-    <section id="architecture" class="frame reading-section" aria-labelledby="architecture-title">
-      <h2 id="architecture-title">Harness 如何把各环节接起来</h2>
-      <p class="section-intro">一次用户请求通常对应一个 <strong>Turn（回合）</strong>。回合可包含多个 <strong>Step（步骤）</strong>，每步发起模型请求，处理回复及其中的工具调用。工具结果需要模型继续处理时，循环进入下一步。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></p>
-
-      <div class="mechanism-grid">
-        <article class="mechanism">
-          <p class="package-name">core/agent-loop</p>
-          <h3>循环驱动请求</h3>
-          <p>默认循环准备系统提示、可用工具的定义和会话历史，再通过模型适配器发起请求。收到工具结果后，它可以再次请求模型。当前步骤无需继续时，循环经过回合终止检查后结束。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></p>
-        </article>
-        <article class="mechanism">
-          <p class="package-name">core/tools</p>
-          <h3>运行时调度工具</h3>
-          <p>工具插件注册工具及其输入结构。模型输出工具名和参数，执行器在当前智能体可用的工具中分派调用。执行前后可通过钩子接入参数检查、审批或结果处理。<sup><a href="#ref-tools" aria-label="来源 2">[2]</a></sup></p>
-        </article>
-        <article class="mechanism">
-          <p class="package-name">core/session</p>
-          <h3>从日志生成上下文</h3>
-          <p>用户输入、模型回复、工具调用和结果追加到会话事件日志。循环从事件推导模型消息历史。应用也可以读取事件，呈现执行过程。<sup><a href="#ref-session" aria-label="来源 3">[3]</a></sup></p>
-        </article>
-      </div>
-
-      <div class="plugin-note">
-        <h3>为什么这些部件可以换？</h3>
-        <p>底层框架 <strong>Cordis</strong> 允许插件通过共享上下文注册服务与事件。模型适配器、会话日志、工具注册表和循环本身都由插件提供，因此配置可以选择一组不同的实现。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></p>
-      </div>
-    </section>
-
-    <section id="limits" class="frame reading-section divided" aria-labelledby="limits-title">
-      <h2 id="limits-title">适用条件与限制</h2>
-      <ul class="limits">
-        <li><strong>调用需要可用的模型和工具。</strong> 模型接口要支持工具调用，工具要在当前智能体的作用域中注册，并满足该环境的权限与执行条件。<sup><a href="#ref-tools" aria-label="来源 2">[2]</a></sup></li>
-        <li><strong>执行可能失败。</strong> 工具可能被策略拒绝、遇到无效参数或超时。示例把超时作为结果回传，让模型说明无法获取数据。<sup><a href="#ref-tools" aria-label="来源 2">[2]</a></sup></li>
-        <li><strong>回合何时结束取决于运行时。</strong> 模型直接回复且没有待处理输入时，回合可以结束。终止钩子也可以请求继续。示例省略流式响应、并发执行和扩展钩子。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></li>
-      </ul>
-    </section>
-
-    <section id="references" class="frame reading-section divided" aria-labelledby="references-title">
+    <section id="references" class="frame reading-section" aria-labelledby="references-title">
       <h2 id="references-title">参考资料</h2>
       <p class="section-intro">本文依据 <time datetime="2026-11-18">2026 年 11 月 18 日</time>查阅的公开技术预览文档，聚焦默认 <code>agent-loop</code> 的模型发起型工具调用。</p>
       <ol class="references">
