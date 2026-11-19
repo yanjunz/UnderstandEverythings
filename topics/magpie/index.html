@@ -34,6 +34,7 @@
         <a href="#translation">协议转换</a>
         <a href="#routing">路由与故障切换</a>
         <a href="#boundaries">能力边界</a>
+        <a href="#questions">读者问题</a>
         <a href="#sources">资料与源码</a>
       </nav>
     </aside>
@@ -61,6 +62,7 @@
               <a href="#perspectives" class="button primary"
                 >选择讲解视角 <span class="arrow" aria-hidden="true">↓</span></a
               >
+              <a href="#questions" class="button">读者问题</a>
             </div>
           </div>
           <div class="hero-art" aria-hidden="true">
@@ -219,6 +221,18 @@
             <p class="section-lead">
               假设你在 Claude Code 中选择了
               DeepSeek，然后输入「解释一下这个函数」。点下一步，看这句话如何抵达模型。
+            </p>
+            <p class="section-lead">
+              这里有两次选择。配置时，Claude Code 的请求地址被指到
+              Magpie，每次调用会先到本机。请求到达后，Magpie
+              才根据这次填写的模型名称选上游。比如选择
+              <code>deepseek/deepseek-chat</code> 时，前一段指定你在 Magpie
+              配置的供应商，后一段指定要调用的模型。把两段都看清楚，就能解释为什么同一个
+              Claude Code 可以先问 DeepSeek，再换另一个模型。<a
+                href="#ref-wiring"
+                >接入配置</a
+              >
+              · <a href="#ref-routing">模型路由</a>
             </p>
             <div class="experiment flow-experiment">
               <div class="experiment-header">
@@ -486,6 +500,47 @@ model: deepseek/deepseek-chat
                 </dd>
               </div>
             </dl>
+            <div class="request-walkthrough">
+              <h4>跟着字段走一次</h4>
+              <ol>
+                <li>
+                  <strong>入口读取请求。</strong> Claude Code 向本机的
+                  <code>/v1/messages</code> 发送
+                  <code>model: deepseek/deepseek-chat</code
+                  >、用户消息和输出上限。入口路径决定如何解析字段，调用方身份可以另行归因。<a
+                    href="#ref-routing"
+                    >入口与调用方</a
+                  >
+                </li>
+                <li>
+                  <strong>路由确定下一跳。</strong>
+                  网关从供应商配置取目标协议、基础地址和认证方式。假设 DeepSeek
+                  上游只提供 Chat Completions，转发请求的
+                  <code>model</code> 对应上游的
+                  <code>deepseek-chat</code>，消息与输出上限也按目标 API
+                  编码。<a href="#ref-routing">候选选择</a> ·
+                  <a href="#ref-ir">字段表示</a>
+                </li>
+                <li>
+                  <strong>回程保留关联。</strong>
+                  比如模型流式返回工具名称和分段参数，转回 Messages
+                  时需要把这些分片放回同一次工具调用，并保留调用标识。普通模型
+                  API 路径中，Agent 收到这条工具请求后才决定是否执行。<a
+                    href="#ref-ir"
+                    >流式事件</a
+                  >
+                  · <a href="#boundaries">执行边界</a>
+                </li>
+                <li>
+                  <strong>失败点决定是否可换上游。</strong>
+                  如果上游在任何回复发给 Agent
+                  前返回可重试错误，网关可以尝试下一位候选。已经发出部分回复时，客户端已有流式状态，需要按该路径的失败行为处理。Routing
+                  记录可以用来核对实际候选和响应方。<a href="#ref-routing"
+                    >失败分支</a
+                  >
+                </li>
+              </ol>
+            </div>
             <p class="architecture-note">
               <strong>设计取舍。</strong
               >共用中间表示可以让各协议共用路由与转发逻辑。集成时仍要验证工具调用标识、结束信号和目标模型的能力。故障切换也取决于客户端是否已经收到回复，开始输出后需要保留已发送内容的语义。<a
@@ -777,6 +832,93 @@ model: deepseek/deepseek-chat
         </section>
 
         <section
+          id="questions"
+          class="sources-section reader-questions"
+          aria-labelledby="questions-heading"
+        >
+          <h2 id="questions-heading">读者问题</h2>
+          <article id="custom-gateway">
+            <h3>
+              Magpie 怎么知道 Agent 用哪家模型？我的 Agent 和自建 LLM Gateway
+              能接入吗？
+            </h3>
+            <p>
+              <strong
+                >如果你的 Gateway 提供 Magpie 支持的模型
+                API，它就可以作为自定义上游。</strong
+              >
+              你的 Agent 可以同时作为调用方，向 Magpie 发请求。Magpie
+              需要接到这次请求，才能根据其中的模型名选择供应商。只要 Agent
+              仍直连原 Gateway，调用就沿原路径走。<a href="#ref-providers"
+                >自定义供应商</a
+              >
+              · <a href="#ref-routing">请求路由</a>
+            </p>
+            <p>
+              假设你的 Gateway 支持 OpenAI Chat Completions，并提供模型
+              <code>team-chat</code>。以下地址和名称是示意。
+            </p>
+            <pre
+              class="flow-code"
+            ><code>你的 Agent → Magpie → 自建 LLM Gateway → 实际模型
+
+Agent Base URL  http://127.0.0.1:3425/v1
+Agent model     my-gateway/team-chat
+
+Magpie 自定义供应商  my-gateway
+上游 Base URL        https://gateway.example.com/v1
+上游模型             team-chat</code></pre>
+            <ol>
+              <li>
+                在 Magpie 添加自定义供应商，配置 Gateway 的 Base
+                URL、协议、认证和模型。Chat Completions 是一种选择，Magpie
+                还支持 Responses、Anthropic Messages 和 Gemini 等接口。Agent
+                使用 Magpie 入口的凭据，上游凭据则配在对应供应商。<a
+                  href="#ref-providers"
+                  >供应商协议与凭据</a
+                >
+              </li>
+              <li>
+                把自研 Agent 的模型请求地址改为 Magpie，并选择 Magpie
+                列出的模型标识。推荐使用配置后的
+                <code>供应商/模型</code> 名，或选择已配置的路由组。图中的
+                <code>my-gateway</code> 是假定的供应商 ID，实际填写时以 Magpie
+                显示的为准。<a href="#ref-routing">模型标识与路由组</a>
+              </li>
+              <li>
+                Magpie 可从已知 Agent 的路径、调用凭据或
+                <code>User-Agent</code> 识别谁发来了请求。对自研
+                Agent，可以直接配置客户端的模型 API 地址。Agent
+                在列表里是否有专用的一键接入，与这次模型请求能否转发是两个问题。<a
+                  href="#ref-caller"
+                  >调用方识别源码</a
+                >
+                · <a href="#ref-wiring">Agent 接入配置</a>
+              </li>
+            </ol>
+            <p>
+              <strong>如果你想把整个 Agent 当作上游</strong
+              >，需要由它本身或适配层提供兼容的模型接口。比如你的 Agent
+              只接受「提交任务」并返回任务 ID，Magpie
+              需要一个能按模型协议接收消息、返回回复的适配层才能调用它。若客户端需要流式输出和工具调用，适配层也要遵循相应协议。<a
+                href="#ref-providers"
+                >上游接口</a
+              >
+              · <a href="#ref-ir">消息与流式事件</a>
+            </p>
+            <p>
+              排查时看两边的路由记录。Magpie 的
+              <code>X-Magpie-Provider</code>、<code>X-Magpie-Model</code>
+              能确认它选了哪一跳。若自建 Gateway
+              还会二次路由，最终用哪家模型要看自建 Gateway 的记录。<a
+                href="#ref-routing"
+                >响应方记录</a
+              >
+            </p>
+          </article>
+        </section>
+
+        <section
           id="sources"
           class="sources-section"
           aria-labelledby="sources-heading"
@@ -824,6 +966,26 @@ model: deepseek/deepseek-chat
               </div>
               <b>↗</b></a
             >
+            <a
+              id="ref-providers"
+              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/docs/subsystems/providers-accounts.md"
+            >
+              <div>
+                <strong>供应商与账号</strong
+                ><small>自定义地址、模型列表、协议与凭据</small>
+              </div>
+              <b>↗</b>
+            </a>
+            <a
+              id="ref-caller"
+              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/gateway.go#L55-L84"
+            >
+              <div>
+                <strong>源码：识别调用方</strong
+                ><small>agentOf 如何解析请求来源</small>
+              </div>
+              <b>↗</b>
+            </a>
           </div>
           <a href="sources.md" class="sources-more">完整来源与实现对照 →</a>
         </section>

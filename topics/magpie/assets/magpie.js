@@ -292,7 +292,7 @@
     updateQuiz();
   });
 
-  const sections = $$("#perspectives, .lesson-section, #sources");
+  const sections = $$("#perspectives, .lesson-section, #questions, #sources");
   const nav = $$(".chapter-nav a");
   let scheduled = false;
   function updateReading() {

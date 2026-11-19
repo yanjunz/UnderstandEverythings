@@ -413,6 +413,8 @@ section[id] { scroll-margin-top: 1.5rem; }
 
 .beginner-steps li::marker { color: var(--accent-dark); font-weight: 700; }
 .beginner-steps span { display: block; color: var(--muted); }
+.beginner-example { max-width: 54rem; margin-top: 1.4rem; }
+.beginner-example p, .trace-example pre + p { margin-top: .65rem; color: var(--muted); }
 .mechanism-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-top: 1.35rem; }
 
 .mechanism {

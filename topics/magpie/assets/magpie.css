@@ -145,6 +145,7 @@
 .hero-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 23px;
   margin-top: 25px;
 }
@@ -1519,6 +1520,32 @@ h4 {
 
 .sources-section {
   margin-top: 48px;
+}
+.request-walkthrough,
+.reader-questions article {
+  margin-top: 18px;
+  padding: clamp(14px, 3vw, 22px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+}
+.request-walkthrough ol,
+.reader-questions ol {
+  margin: 0.7em 0;
+  padding-inline-start: 1.4em;
+}
+.request-walkthrough li + li,
+.reader-questions li + li,
+.reader-questions p,
+.reader-questions pre {
+  margin-top: 0.7em;
+}
+.request-walkthrough a,
+.reader-questions a {
+  margin-inline-start: 0.35em;
+  color: var(--green);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
 }
 .sources-section > p {
   margin: 10px 0 16px;

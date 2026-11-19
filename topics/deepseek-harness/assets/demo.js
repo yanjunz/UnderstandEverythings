@@ -4,15 +4,24 @@ const weatherQuestion = "北京现在的天气怎么样？";
 const scenarios = {
   success: {
     question: weatherQuestion,
-    toolResult: { condition: "晴", temperature_c: 22 },
+    weather: [{ city: "北京", result: { condition: "晴", temperature_c: 22 } }],
     answer: "北京现在晴，气温 22°C。",
     description: "模型根据工具返回的晴天和 22°C 写出答复。没有待处理的输入，也没有继续执行的要求，本轮结束。",
   },
   timeout: {
     question: weatherQuestion,
-    toolResult: { error: "TIMEOUT", message: "天气工具请求超时" },
+    weather: [{ city: "北京", result: { error: "TIMEOUT", message: "天气工具请求超时" } }],
     answer: "天气查询超时，我暂时无法确认北京现在的天气。",
     description: "模型读到超时信息，说明这次查询的结果。这个场景未配置重试，当前回合结束。",
+  },
+  partial: {
+    question: "北京和上海现在各是什么天气？",
+    weather: [
+      { city: "北京", result: { condition: "晴", temperature_c: 22 } },
+      { city: "上海", result: { error: "TIMEOUT", message: "天气工具请求超时" } },
+    ],
+    answer: "北京现在晴，气温 22°C。上海的天气查询超时，暂时无法确认。",
+    description: "同一轮有两笔调用。模型按调用编号读到北京的天气和上海的超时结果，在答复里分别说明。",
   },
   direct: {
     question: "摄氏度怎样换算成华氏度？",
@@ -42,24 +51,37 @@ function createTrace(scenario) {
     },
   }];
 
-  if (scenario.toolResult) {
-    const toolCall = { id: "weather_1", name: weatherTool.name, arguments: { city: "北京" } };
-    const toolMessage = { role: "tool", tool_call_id: toolCall.id, content: scenario.toolResult };
+  if (scenario.weather) {
+    const toolCalls = scenario.weather.map(({ city }, index) => ({
+      id: `weather_${index + 1}`,
+      name: weatherTool.name,
+      arguments: { city },
+    }));
+    const toolMessages = scenario.weather.map(({ result }, index) => ({
+      role: "tool",
+      tool_call_id: toolCalls[index].id,
+      content: result,
+    }));
 
     trace.push(
       {
         title: "提出工具调用",
         owner: "DeepSeek 模型",
-        description: "模型发出工具名和参数。运行时接收调用请求，并在会话中记录对应的调用标识。",
+        description: "模型发出工具名和参数。一条回复可以提出多笔调用，运行时为每笔保留对应的调用标识。",
         label: "会话事件 · tool/call",
-        payload: toolCall,
+        payload: { calls: toolCalls },
       },
       {
         title: "执行天气工具",
         owner: "Harness · 工具插件",
         description: "执行器确认工具可用并检查参数，再运行天气工具。成功数据和超时信息都可以成为工具结果。",
         label: "会话事件 · tool/result",
-        payload: { call_id: toolCall.id, result: scenario.toolResult },
+        payload: {
+          results: toolMessages.map(({ tool_call_id, content }) => ({
+            call_id: tool_call_id,
+            result: content,
+          })),
+        },
       },
       {
         title: "回填结果并继续",
@@ -67,9 +89,7 @@ function createTrace(scenario) {
         description: "运行时追加记录，从日志生成下一次请求的消息历史。工具结果通过调用标识与原请求对应。",
         label: "下一次模型请求 · 消息历史",
         payload: {
-          user: userMessage,
-          assistant: { role: "assistant", tool_call_id: toolCall.id, name: toolCall.name },
-          tool: toolMessage,
+          messages: [userMessage, { role: "assistant", tool_calls: toolCalls }, ...toolMessages],
         },
       },
     );

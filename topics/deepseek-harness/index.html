@@ -81,6 +81,11 @@
           <li><strong>把「请查北京」变成实际查询</strong><span>模型提交天气工具和城市名。Harness 检查这次请求，再执行天气工具。</span></li>
           <li><strong>把查到的数据变成回答</strong><span>假设工具返回「晴、22°C」，Harness 把结果发回模型。模型读到数据后，组织成一句你能直接读懂的答复。</span></li>
         </ol>
+        <div class="beginner-example">
+          <h4>为什么同一个问题要问模型两次？</h4>
+          <p>第一次请模型判断需要什么信息。模型只看到了「查天气」这项工具的说明，还没拿到天气数据。工具运行完以后，Harness 把问题、模型提出的查询和工具给出的数据一起发回去，第二次才有条件根据数据回答。</p>
+          <p>如果你同时问北京和上海，模型可以一次提出两笔查询。每笔查询都有自己的编号。演示里北京查到了「晴、22°C」，上海超时，最后的答复就可以给出北京的数据，并说明上海暂时查不到。<sup><a href="#ref-api" aria-label="来源 4">[4]</a></sup></p>
+        </div>
         <div class="plugin-note">
           <h4>工具超时，或者根本用不到工具</h4>
           <p>天气查询超时时，演示中的模型会说明暂时无法确认。像「摄氏度怎样换算成华氏度」这样的问题，模型可以直接用公式回答。此时通常一次调用模型就够了。</p>
@@ -121,16 +126,38 @@
 turn/end</code></pre>
         </div>
 
+        <div class="trace-example">
+          <h4>从会话事件到第二次模型请求</h4>
+          <p>会话日志既记录运行过程，也提供模型消息的来源。下图用北京查询展示两种表示。事件名来自 dsh 文档，字段和值是教学简写。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup><sup><a href="#ref-session" aria-label="来源 3">[3]</a></sup></p>
+          <pre><code>会话记录
+  user/message       “北京现在的天气怎么样？”
+  assistant/message  请求 get_weather，编号 weather_1
+  tool/call          weather_1，参数 city=北京
+  tool/result        weather_1，结果 晴、22°C
+
+第二次请求的消息历史
+  user       北京现在的天气怎么样？
+  assistant  工具调用 weather_1，get_weather(city=北京)
+  tool       对应 weather_1，晴、22°C</code></pre>
+          <p>循环通过 <code>deriveMessages()</code> 从日志推导消息历史，模型适配器再按提供方协议发送。<code>step/start</code>、<code>step/end</code> 等事件用于运行过程。界面可以用实时流增量先呈现文字，失败尝试可记录为 <code>assistant/attempt</code>，它留在日志内供排查。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup><sup><a href="#ref-session" aria-label="来源 3">[3]</a></sup></p>
+        </div>
+
         <div id="limits" class="architecture-notes">
           <h4>失败分支与设计取舍</h4>
           <dl>
+            <dt>工具定义在哪一层生效</dt>
+            <dd>组装请求时向模型提供工具名称、用途和参数结构。执行时还要由作用域内的执行器处理真实调用。<code>tools/pre-execute</code> 可以接入审批、拒绝或取消，再由 <code>tools/execute</code> 包装超时等执行策略，最后由 <code>tools/post-execute</code> 处理结果。<sup><a href="#ref-tools" aria-label="来源 2">[2]</a></sup></dd>
             <dt>工具失败如何传递</dt>
-            <dd>执行前策略可以拒绝、取消或要求审批。执行包装器可以施加超时限制；例如天气工具超时后，错误结果会与原调用关联。循环可以把模型可见的错误信息带入下一步。<sup><a href="#ref-tools" aria-label="来源 2">[2]</a></sup></dd>
+            <dd>以两城查询为例，模型的同一条回复可以包含两个调用。结果仍按编号匹配。北京成功、上海超时时，下一次请求可以同时携带北京的数据和上海的错误信息。工具失败后是否重试，需要看执行策略和后续模型请求。对超时的调用，演示选择把错误直接回填。<sup><a href="#ref-tools" aria-label="来源 2">[2]</a></sup></dd>
             <dt>回合何时结束</dt>
             <dd>如果结果需要模型继续处理，或有新的待处理输入，循环可以再跑一步。准备结束时还会经过 <code>agent/turn-stopping</code> 检查。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></dd>
             <dt>可替换的部件带来什么约束</dt>
             <dd>Cordis 允许通过插件注册模型适配器、工具、日志和循环。对集成者而言，替换组件时仍需对齐工具可见范围、结果格式与日志语义。会话可从日志重建消息历史，外部工具副作用的重试与补偿需要由工具和集成方案处理。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup><sup><a href="#ref-session" aria-label="来源 3">[3]</a></sup></dd>
           </dl>
+        </div>
+        <div class="plugin-note">
+          <h4>排查时先看停在哪一步</h4>
+          <p>看不到查询请求，先检查工具声明是否进入模型请求。已经有 <code>tool/call</code>，就按同一编号跟到 <code>tool/result</code>，看执行、超时或拒绝情况。结果正常但回复没有用到数据时，继续核对下一步实际发送的消息历史和最后生成的回复。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup><sup><a href="#ref-tools" aria-label="来源 2">[2]</a></sup></p>
         </div>
         <a class="perspective-demo-link" href="#demo">在演示中查看输入和输出 ↓</a>
       </section>
@@ -148,6 +175,7 @@ turn/end</code></pre>
               <select id="scenario">
                 <option value="success">查询成功</option>
                 <option value="timeout">工具超时</option>
+                <option value="partial">两城查询，部分成功</option>
                 <option value="direct">直接回答</option>
               </select>
             </div>
@@ -187,7 +215,7 @@ turn/end</code></pre>
             <li>模型根据数据回答。如果收到超时信息，示例回复会说明无法获取当前天气。如果模型直接生成文本且没有继续条件，本轮可以在第一次推理后结束。</li>
           </ol>
         </noscript>
-        <p class="demo-note">演示使用单个自定义天气工具。工具输出与模型回复均为模拟数据。<sup><a href="#ref-api" aria-label="来源 4">[4]</a></sup></p>
+        <p class="demo-note">演示使用同一个自定义天气工具，可以在一条模型回复里调用多次。工具输出与模型回复均为模拟数据。<sup><a href="#ref-api" aria-label="来源 4">[4]</a></sup></p>
       </div>
     </section>
 
