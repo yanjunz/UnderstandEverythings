@@ -253,6 +253,40 @@ section[id] { scroll-margin-top: 1.5rem; }
 
 .simulator-top { border-bottom: 1px solid var(--line); }
 .simulator-footer { border-top: 1px solid var(--line); }
+.flow-play {
+  padding: .45rem .75rem;
+  border: 1px solid var(--accent);
+  border-radius: .45rem;
+  background: var(--accent);
+  color: white;
+  font-size: .875rem;
+  font-weight: 700;
+}
+.flow-play:hover { background: var(--accent-dark); }
+.harness-motion {
+  --flow-surface: #ecf0fe;
+  --flow-paper: var(--paper);
+  --flow-ink: var(--ink);
+  --flow-muted: var(--muted);
+  --flow-line: #9baad1;
+  --flow-accent: var(--accent);
+  --flow-highlight: #dde5ff;
+  --flow-ring: #3049e42b;
+  border-bottom: 1px solid var(--line);
+}
+.motion-branch { display: grid; justify-items: stretch; width: min(36%, 13rem); margin: 0 auto; }
+.motion-branch .motion-node { min-height: 3.4rem; }
+.motion-branch .session-edge { min-height: 1.55rem; }
+.motion-branch .session-edge::before { inset-inline: auto; width: 2px; height: 100%; }
+.motion-branch .session-edge[data-direction]::after { content: "↓"; }
+.motion-branch .session-edge[data-direction] .motion-packet { animation: motion-down 1.15s ease-in-out; }
+@keyframes motion-down {
+  from { top: 0; opacity: 1; }
+  to { top: calc(100% - .48rem); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .motion-branch .session-edge[data-direction] .motion-packet { animation: none; }
+}
 .scenario { display: flex; align-items: center; gap: .6rem; }
 .scenario label { font-size: .85rem; font-weight: 700; }
 

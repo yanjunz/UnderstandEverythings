@@ -11,8 +11,10 @@
     <title>Magpie 的运行原理 · 理解万物</title>
     <link rel="icon" href="assets/mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="assets/base.css" />
+    <link rel="stylesheet" href="../../assets/flow-motion.css" />
     <link rel="stylesheet" href="assets/magpie.css" />
     <script defer src="../../assets/perspectives.js"></script>
+    <script defer src="../../assets/flow-motion.js"></script>
     <script defer src="assets/magpie.js"></script>
     <script defer src="../../assets/pageviews.js"></script>
   </head>
@@ -27,9 +29,9 @@
         <strong>理解 Magpie</strong><span>从一次请求，看懂本地网关</span>
       </div>
       <nav aria-label="本篇目录" class="chapter-nav">
+        <a href="#journey">请求动画</a>
         <a href="#perspectives">讲解视角</a>
         <a href="#intuition">各方职责</a>
-        <a href="#journey">请求流程</a>
         <a href="#recap">自测</a>
         <a href="#gateway-architecture">网关架构</a>
         <a href="#translation">协议转换</a>
@@ -60,8 +62,8 @@
               DeepSeek？跟着一次请求，看看本地网关怎样选择模型、转换协议并返回结果。
             </p>
             <div class="hero-actions">
-              <a href="#perspectives" class="button primary"
-                >选择讲解视角 <span class="arrow" aria-hidden="true">↓</span></a
+              <a href="#journey" class="button primary"
+                >观看核心动画 <span class="arrow" aria-hidden="true">↓</span></a
               >
               <a href="#questions" class="button">读者问题</a>
             </div>
@@ -114,6 +116,158 @@
             ></span
           ><span>3 个互动实验 · 3 道自测题</span>
         </div>
+
+        <section
+          id="journey"
+          class="lesson-section"
+          aria-labelledby="journey-title"
+        >
+          <div class="section-heading">
+            <h2 id="journey-title">改了哪个地址？两段请求各用什么凭据？</h2>
+          </div>
+          <p class="section-lead">
+            看 Agent 从直连原服务切换到本机
+            Magpie，再跟着同一次请求走到上游。可以切换 Codex 或 Claude
+            Code，也可以模拟上游拒绝认证。
+          </p>
+          <div
+            class="experiment flow-experiment"
+            id="gateway-experiment"
+            hidden
+          >
+            <div class="experiment-header flow-options">
+              <div class="flow-select">
+                <label for="flow-agent">Agent</label>
+                <select id="flow-agent">
+                  <option value="claude">Claude Code</option>
+                  <option value="codex">Codex</option>
+                </select>
+              </div>
+              <div class="flow-select">
+                <label for="flow-outcome">上游结果</label>
+                <select id="flow-outcome">
+                  <option value="success">返回回复</option>
+                  <option value="unauthorized">凭据无效，返回 401</option>
+                </select>
+              </div>
+              <button type="button" id="flow-play" class="button primary">
+                自动播放
+              </button>
+            </div>
+            <div class="motion-board magpie-motion" id="flow-diagram">
+              <p class="endpoint-readout">
+                <strong>Agent 当前 Base URL</strong>
+                <code id="flow-address"></code>
+              </p>
+              <div class="motion-lane is-direct" id="direct-lane">
+                <div class="motion-node" data-flow-node="agent">
+                  <strong id="direct-agent-name">Claude Code</strong
+                  ><span>使用原服务凭据</span>
+                </div>
+                <div
+                  class="motion-edge"
+                  data-flow-link="direct"
+                  aria-hidden="true"
+                >
+                  <span class="motion-packet"></span>
+                </div>
+                <div class="motion-node" data-flow-node="original">
+                  <strong>原模型服务</strong><span>按原服务规则鉴权</span>
+                </div>
+              </div>
+              <div class="motion-lane" id="gateway-lane" hidden>
+                <div class="motion-node" data-flow-node="agent">
+                  <strong id="gateway-agent-name">Claude Code</strong
+                  ><span>发起模型请求</span>
+                </div>
+                <div
+                  class="motion-edge"
+                  data-flow-link="local"
+                  aria-hidden="true"
+                >
+                  <span class="motion-packet"></span>
+                </div>
+                <div class="motion-node" data-flow-node="magpie">
+                  <strong>本机 Magpie</strong><span>接收、选路、转换</span>
+                </div>
+                <div
+                  class="motion-edge"
+                  data-flow-link="upstream"
+                  aria-hidden="true"
+                >
+                  <span class="motion-packet"></span>
+                </div>
+                <div class="motion-node" data-flow-node="provider">
+                  <strong>上游 DeepSeek</strong><span>验证上游凭据</span>
+                </div>
+              </div>
+              <div class="flow-credentials" id="flow-credentials" hidden>
+                <div>
+                  <strong>Agent → Magpie</strong
+                  ><span>本机入口策略或 Magpie Gateway key</span>
+                </div>
+                <div>
+                  <strong>Magpie → 上游</strong
+                  ><span>供应商认可的 API key</span>
+                </div>
+              </div>
+              <p class="motion-caption" id="flow-caption"></p>
+            </div>
+            <div class="flow-detail" aria-live="polite" aria-atomic="true">
+              <div>
+                <span class="step-overline" id="flow-step-label"></span>
+                <h3 id="flow-title"></h3>
+                <p id="flow-description"></p>
+              </div>
+              <pre id="flow-code" class="flow-code"></pre>
+            </div>
+            <div
+              class="flow-stepper"
+              id="flow-steps"
+              role="group"
+              aria-label="选择请求步骤"
+            ></div>
+            <div class="experiment-controls">
+              <div>
+                <button
+                  type="button"
+                  id="flow-back"
+                  class="button quiet"
+                  aria-label="上一步"
+                >
+                  ←
+                </button>
+                <button type="button" id="flow-next" class="button">
+                  下一步 →
+                </button>
+                <button type="button" id="flow-reset" class="reset-button">
+                  重置
+                </button>
+              </div>
+            </div>
+          </div>
+          <noscript>
+            <ol class="flow-static">
+              <li>接入前，Agent 使用原服务的地址和凭据直接调用模型。</li>
+              <li>
+                在 Codex 的 provider 或 Claude Code 的 Base URL 设置中选用本机
+                Magpie。Agent 按 Magpie 的入口策略发送请求。
+              </li>
+              <li>
+                Magpie
+                根据模型标识找出自己配置的上游地址、协议和凭据，再向模型服务发出新请求。
+              </li>
+              <li>
+                上游独立验证自己的凭据。入口请求成功后，上游仍可能返回 401。
+              </li>
+            </ol>
+          </noscript>
+          <p class="flow-sources">
+            动画使用简化请求和示例数据。
+            <a href="#agent-gateway-auth">配置与鉴权实例</a> ·
+            <a href="#ref-routing">路由实现</a>
+          </p>
+        </section>
 
         <section
           id="perspectives"
@@ -217,150 +371,13 @@
             </details>
           </section>
 
-          <section id="journey" class="lesson-section">
-            <div class="section-heading"><h3>跟随一次请求</h3></div>
-            <p class="section-lead">
-              假设你在 Claude Code 中选择了
-              DeepSeek，然后输入「解释一下这个函数」。点下一步，看这句话如何抵达模型。
-            </p>
-            <p class="section-lead">
-              这里有两次选择。配置时，Claude Code 的请求地址被指到
-              Magpie，每次调用会先到本机。请求到达后，Magpie
-              才根据这次填写的模型名称选上游。比如选择
-              <code>deepseek/deepseek-chat</code> 时，前一段指定你在 Magpie
-              配置的供应商，后一段指定要调用的模型。把两段都看清楚，就能解释为什么同一个
-              Claude Code 可以先问 DeepSeek，再换另一个模型。<a
-                href="#ref-wiring"
-                >接入配置</a
-              >
-              · <a href="#ref-routing">模型路由</a>
-            </p>
-            <div class="experiment flow-experiment">
-              <div class="experiment-header">
-                <span><span class="live-dot"></span> 请求旅程</span
-                ><span class="simulation-label">教学模拟 · 不调用真实 API</span>
-              </div>
-              <div
-                class="flow-diagram"
-                id="flow-diagram"
-                data-stage="0"
-                aria-label="请求路径：Claude Code → 本地 Magpie 网关 → DeepSeek；回复沿反方向返回"
-              >
-                <div class="zone-label local-zone">
-                  <span>▣</span> 你的电脑 <i></i>
-                </div>
-                <div class="zone-label remote-zone">模型服务端</div>
-                <div class="flow-node agent-node">
-                  <span class="node-icon">&gt;_</span
-                  ><strong>Claude Code</strong
-                  ><span class="node-desc">保留熟悉的 Agent</span
-                  ><code>Anthropic Messages</code
-                  ><span class="node-status" id="agent-status"
-                    >正在组织请求</span
-                  >
-                </div>
-                <div class="flow-connector first">
-                  <span class="connector-label">请求 →</span>
-                  <div class="wire"><i></i></div>
-                  <span class="connector-reply">← 回复</span>
-                </div>
-                <div class="flow-node gateway-node">
-                  <span class="node-icon">⇄</span><strong>Magpie</strong
-                  ><span class="node-desc">路由 · 翻译 · 转发</span
-                  ><code>127.0.0.1:3425</code
-                  ><span class="node-status" id="gateway-status">等待请求</span>
-                </div>
-                <div class="flow-connector second">
-                  <span class="connector-label">请求 →</span>
-                  <div class="wire"><i></i></div>
-                  <span class="connector-reply">← 回复</span>
-                </div>
-                <div class="flow-node model-node">
-                  <span class="node-icon">✦</span><strong>DeepSeek</strong
-                  ><span class="node-desc">真正生成答案的模型</span
-                  ><code>Chat Completions</code
-                  ><span class="node-status" id="model-status">等待请求</span>
-                </div>
-              </div>
-              <div class="flow-caption">
-                <span class="tiny-line"></span>
-                本地入口协调请求；模型推理发生在选中的服务端。
-              </div>
-              <div class="flow-detail" aria-live="polite" aria-atomic="true">
-                <div>
-                  <span class="step-overline" id="flow-step-label"
-                    >STEP 01 / 06</span
-                  >
-                  <h4 id="flow-title">Agent 把你的话组织成请求</h4>
-                  <p id="flow-description">
-                    Claude Code 把问题、对话上下文和可用工具整理成它熟悉的
-                    Anthropic Messages 格式。它不需要先学会 DeepSeek 的 API。
-                  </p>
-                </div>
-                <pre id="flow-code" class="flow-code">
-POST /v1/messages
-model: deepseek/deepseek-chat
-「解释一下这个函数」</pre
-                >
-              </div>
-              <div class="flow-stepper" role="group" aria-label="选择请求步骤">
-                <button type="button" data-step="0" aria-pressed="true">
-                  <b>1</b><span>组织请求</span></button
-                ><button type="button" data-step="1" aria-pressed="false">
-                  <b>2</b><span>本地接收</span></button
-                ><button type="button" data-step="2" aria-pressed="false">
-                  <b>3</b><span>选择去处</span></button
-                ><button type="button" data-step="3" aria-pressed="false">
-                  <b>4</b><span>转换协议</span></button
-                ><button type="button" data-step="4" aria-pressed="false">
-                  <b>5</b><span>模型回复</span></button
-                ><button type="button" data-step="5" aria-pressed="false">
-                  <b>6</b><span>送回助手</span>
-                </button>
-              </div>
-              <div class="experiment-controls">
-                <button type="button" id="flow-play" class="button primary">
-                  <span aria-hidden="true">▷</span> 自动演示
-                </button>
-                <div>
-                  <button
-                    type="button"
-                    id="flow-back"
-                    class="button quiet"
-                    disabled
-                    aria-label="上一步"
-                  >
-                    ←</button
-                  ><button type="button" id="flow-next" class="button">
-                    下一步 →</button
-                  ><button type="button" id="flow-reset" class="reset-button">
-                    重置
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div class="explanation-pair">
-              <div>
-                <h4><span>↳</span> 它怎么接到请求的？</h4>
-                <p>
-                  Magpie 按不同 Agent
-                  的配置格式，修改模型、基础地址等必要字段，让请求先发到本地网关。各
-                  Agent 的具体接入方式不同，通常需要新会话或重启相关应用。
-                  <a href="#agent-gateway-auth"
-                    >查看 Codex、Claude Code 的配置和认证</a
-                  >
-                </p>
-              </div>
-              <div>
-                <h4><span>⌂</span> 这个地址是什么意思？</h4>
-                <p>
-                  <code>127.0.0.1</code> 表示「这台电脑自己」，<code>3425</code>
-                  是默认端口。外部 API 服务的凭据由 Magpie
-                  管理；本地入口与上游认证是两层概念。
-                </p>
-              </div>
-            </div>
-          </section>
+          <p class="section-lead">
+            <a href="#journey">用动画看一个请求经过哪两段</a>
+            ·
+            <a href="#agent-gateway-auth"
+              >查看 Codex、Claude Code 的具体配置和凭据</a
+            >
+          </p>
 
           <section id="recap" class="lesson-section">
             <div class="section-heading"><h3>检查你的理解</h3></div>

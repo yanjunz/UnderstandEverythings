@@ -1,0 +1,102 @@
+.motion-board {
+  padding: clamp(.75rem, 2.5vw, 1.5rem);
+  background: var(--flow-surface);
+  color: var(--flow-ink);
+}
+
+.motion-lane {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(1.25rem, 8vw, 6.5rem) minmax(0, 1fr) clamp(1.25rem, 8vw, 6.5rem) minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.motion-lane.is-direct {
+  grid-template-columns: minmax(0, 1fr) clamp(1.5rem, 18vw, 12rem) minmax(0, 1fr);
+}
+
+.motion-lane[hidden] { display: none; }
+
+.motion-node {
+  display: grid;
+  align-content: center;
+  gap: .18rem;
+  min-height: 4.5rem;
+  padding: .5rem .45rem;
+  border: 1px solid var(--flow-line);
+  border-radius: .6rem;
+  background: var(--flow-paper);
+  text-align: center;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.motion-node strong { font-size: .95rem; }
+.motion-node span, .motion-node code { color: var(--flow-muted); font-size: .75rem; }
+.motion-node[data-active] {
+  border-color: var(--flow-accent);
+  background: var(--flow-highlight);
+  box-shadow: 0 0 0 2px var(--flow-ring);
+}
+
+.motion-edge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  align-self: center;
+  min-height: 1.65rem;
+  color: var(--flow-line);
+}
+
+.motion-edge::before {
+  position: absolute;
+  inset-inline: 0;
+  height: 2px;
+  background: currentColor;
+  content: "";
+}
+
+.motion-edge[data-direction] { color: var(--flow-accent); }
+.motion-edge[data-direction]::after {
+  position: relative;
+  background: var(--flow-surface);
+  padding-inline: 2px;
+  font-weight: 800;
+  content: "→";
+}
+.motion-edge[data-direction="backward"]::after { content: "←"; }
+
+.motion-packet {
+  position: absolute;
+  z-index: 1;
+  width: .48rem;
+  height: .48rem;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+}
+
+.motion-edge[data-direction="forward"] .motion-packet { animation: motion-across 1.15s ease-in-out; }
+.motion-edge[data-direction="backward"] .motion-packet { animation: motion-back 1.15s ease-in-out; }
+
+@keyframes motion-across {
+  from { left: 0; opacity: 1; }
+  85% { opacity: 1; }
+  to { left: calc(100% - .48rem); opacity: 0; }
+}
+
+@keyframes motion-back {
+  from { left: calc(100% - .48rem); opacity: 1; }
+  85% { opacity: 1; }
+  to { left: 0; opacity: 0; }
+}
+
+.motion-caption {
+  margin: .7rem 0 0;
+  color: var(--flow-ink);
+  font-size: .85rem;
+  font-weight: 650;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-edge[data-direction] .motion-packet { animation: none; }
+}

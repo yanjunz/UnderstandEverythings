@@ -43,6 +43,8 @@ function createTrace(scenario) {
     title: "组装模型上下文",
     owner: "Harness",
     description: "运行时将系统提示、用户消息和可用工具定义送给模型。这里的工具定义说明了天气工具的用途及必填参数。",
+    motion: { nodes: ["harness", "model"], link: "model" },
+    caption: "Harness → 模型 · 第一次请求带上问题和工具定义",
     label: "模型输入",
     payload: {
       system: "根据用户问题作答，需要当前天气时使用可用工具。",
@@ -62,31 +64,58 @@ function createTrace(scenario) {
       tool_call_id: toolCalls[index].id,
       content: result,
     }));
+    const results = toolMessages.map(({ tool_call_id, content }) => ({
+      call_id: tool_call_id,
+      result: content,
+    }));
+    const resultLabels = scenario.weather.map(({ city, result }, index) => {
+      const outcome = result.error ? "超时" : `${result.condition}、${result.temperature_c}°C`;
+      return `${toolCalls[index].id} ${city}${outcome}`;
+    });
 
     trace.push(
       {
         title: "提出工具调用",
         owner: "DeepSeek 模型",
         description: "模型发出工具名和参数。一条回复可以提出多笔调用，运行时为每笔保留对应的调用标识。",
+        motion: { nodes: ["model", "harness"], link: "model", direction: "backward" },
+        caption: "模型 → Harness · 返回工具名、参数和调用编号",
         label: "会话事件 · tool/call",
+        payload: { calls: toolCalls },
+      },
+      {
+        title: "把查询交给工具",
+        owner: "Harness",
+        description: "Harness 按当前作用域检查可用工具和参数，将模型请求分派给天气工具。",
+        motion: { nodes: ["harness", "tool"], link: "tool", direction: "backward" },
+        caption: "Harness → 工具 · 运行 get_weather",
+        label: "执行器收到的调用",
         payload: { calls: toolCalls },
       },
       {
         title: "执行天气工具",
         owner: "Harness · 工具插件",
-        description: "执行器确认工具可用并检查参数，再运行天气工具。成功数据和超时信息都可以成为工具结果。",
+        description: "天气工具把查询结果交还给 Harness。查到的天气和超时信息都按各自的编号返回。",
+        motion: { nodes: ["tool", "harness"], link: "tool" },
+        caption: `工具 → Harness · ${resultLabels.join(" / ")}`,
+        label: "工具返回结果",
+        payload: { results },
+      },
+      {
+        title: "写入会话日志",
+        owner: "Harness · 会话日志",
+        description: "Harness 追加工具结果事件。日志保留结果对应哪次调用，后续组装模型消息时会用到这个关系。",
+        motion: { nodes: ["harness", "session"], link: "session" },
+        caption: "Harness → 会话日志 · 追加 tool/result",
         label: "会话事件 · tool/result",
-        payload: {
-          results: toolMessages.map(({ tool_call_id, content }) => ({
-            call_id: tool_call_id,
-            result: content,
-          })),
-        },
+        payload: { results },
       },
       {
         title: "回填结果并继续",
         owner: "Harness · 会话日志",
         description: "运行时追加记录，从日志生成下一次请求的消息历史。工具结果通过调用标识与原请求对应。",
+        motion: { nodes: ["session", "harness", "model"], link: "model" },
+        caption: "Harness → 模型 · 第二次请求带上从日志重建的消息历史",
         label: "下一次模型请求 · 消息历史",
         payload: {
           messages: [userMessage, { role: "assistant", tool_calls: toolCalls }, ...toolMessages],
@@ -99,6 +128,8 @@ function createTrace(scenario) {
     title: "给出最终答复",
     owner: "模型生成回复，Harness 结束回合",
     description: scenario.description,
+    motion: { nodes: ["model", "harness"], link: "model", direction: "backward" },
+    caption: "模型 → Harness · 返回最终答复，结束回合",
     label: "会话事件 · assistant/message → turn/end",
     payload: { role: "assistant", content: scenario.answer },
   });
@@ -118,6 +149,8 @@ const stageDescription = document.getElementById("stage-description");
 const payloadTitle = document.getElementById("payload-title");
 const payload = document.getElementById("payload");
 const progress = document.getElementById("step-progress");
+const motionBoard = document.getElementById("harness-motion");
+const motionCaption = document.getElementById("motion-caption");
 
 let trace;
 let stepButtons;
@@ -148,12 +181,15 @@ function showStep(index) {
   stageDescription.textContent = step.description;
   payloadTitle.textContent = step.label;
   payload.textContent = formatPayload(step.payload);
+  showFlowMotion(motionBoard, step.motion);
+  motionCaption.textContent = step.caption;
   progress.textContent = `第 ${index + 1} 步 / 共 ${trace.length} 步 · ${step.title}`;
   previous.disabled = index === 0;
   next.textContent = isLast ? "从头演示" : "下一步";
 }
 
 function loadScenario() {
+  pausePlayback();
   const scenario = scenarios[scenarioSelect.value];
   trace = createTrace(scenario);
   question.textContent = scenario.question;
@@ -168,7 +204,10 @@ function loadScenario() {
     number.textContent = index + 1;
     button.type = "button";
     button.append(number, step.title);
-    button.addEventListener("click", () => showStep(index));
+    button.addEventListener("click", () => {
+      pausePlayback();
+      showStep(index);
+    });
     item.append(button);
     stepButtons.push(button);
     return item;
@@ -178,12 +217,22 @@ function loadScenario() {
   showStep(0);
 }
 
+const pausePlayback = createFlowPlayback(document.getElementById("play-demo"), {
+  hasNext: () => currentStep < trace.length - 1,
+  advance: () => showStep(currentStep + 1),
+  rewind: () => showStep(0),
+});
+
 scenarioSelect.addEventListener("change", loadScenario);
 previous.addEventListener("click", () => {
+  pausePlayback();
   showStep(currentStep - 1);
   if (currentStep === 0) next.focus();
 });
-next.addEventListener("click", () => showStep((currentStep + 1) % trace.length));
+next.addEventListener("click", () => {
+  pausePlayback();
+  showStep((currentStep + 1) % trace.length);
+});
 
 loadScenario();
 simulator.hidden = false;

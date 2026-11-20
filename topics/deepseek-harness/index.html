@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="从一次天气查询理解 DeepSeek Harness 的智能体循环、工具插件和会话日志。">
   <title>DeepSeek Harness 原理 · 理解万物</title>
+  <link rel="stylesheet" href="../../assets/flow-motion.css">
   <link rel="stylesheet" href="assets/topic.css">
   <script defer src="../../assets/perspectives.js"></script>
+  <script defer src="../../assets/flow-motion.js"></script>
   <script defer src="assets/demo.js"></script>
   <script defer src="../../assets/pageviews.js"></script>
 </head>
@@ -32,7 +34,7 @@
         <p class="eyebrow">智能体工程</p>
         <h1 id="page-title">DeepSeek<br><span>Harness 原理</span></h1>
         <p class="hero-lead">你问「北京现在的天气怎么样？」，模型怎么拿到最新数据？DeepSeek Harness（<code>dsh</code>）是 DeepSeek 开源的智能体运行时，负责把模型、工具和它们交换的信息接起来。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></p>
-        <a class="primary-action" href="#perspectives">选择讲解视角 <span aria-hidden="true">↓</span></a>
+        <a class="primary-action" href="#demo">观看核心动画 <span aria-hidden="true">↓</span></a>
       </div>
 
       <figure class="flow">
@@ -59,6 +61,77 @@
           </div>
         </div>
       </figure>
+    </section>
+
+    <section id="demo" class="demo-section" aria-labelledby="demo-title">
+      <div class="frame">
+        <h2 id="demo-title">一次提问，为什么会问模型两遍？</h2>
+        <p class="section-intro">跟着箭头看模型、Harness、工具和会话日志分别传了什么。选择「直接回答」可以观察只请求一次模型的路径。</p>
+
+        <div class="simulator" data-simulator hidden>
+          <div class="simulator-top">
+            <div class="scenario">
+              <label for="scenario">演示场景</label>
+              <select id="scenario">
+                <option value="success">查询成功</option>
+                <option value="timeout">工具超时</option>
+                <option value="partial">两城查询，部分成功</option>
+                <option value="direct">直接回答</option>
+              </select>
+            </div>
+            <p class="question"><span>用户输入</span> <strong id="question"></strong></p>
+            <button type="button" class="flow-play" id="play-demo">自动播放</button>
+          </div>
+          <div class="motion-board harness-motion" id="harness-motion">
+            <div class="motion-lane">
+              <div class="motion-node" data-flow-node="tool"><strong>天气工具</strong><span>执行查询</span></div>
+              <div class="motion-edge" data-flow-link="tool" aria-hidden="true"><span class="motion-packet"></span></div>
+              <div class="motion-node" data-flow-node="harness"><strong>Harness</strong><span>调度、回填</span></div>
+              <div class="motion-edge" data-flow-link="model" aria-hidden="true"><span class="motion-packet"></span></div>
+              <div class="motion-node" data-flow-node="model"><strong>模型</strong><span>DeepSeek · 选择工具、生成答复</span></div>
+            </div>
+            <div class="motion-branch">
+              <div class="motion-edge session-edge" data-flow-link="session" aria-hidden="true"><span class="motion-packet"></span></div>
+              <div class="motion-node" data-flow-node="session"><strong>会话日志</strong><span>保留调用编号</span></div>
+            </div>
+            <p class="motion-caption" id="motion-caption"></p>
+          </div>
+          <div class="simulator-body">
+            <nav class="step-nav" aria-label="模拟执行步骤">
+              <ol id="steps"></ol>
+            </nav>
+            <div class="stage">
+              <div class="stage-heading">
+                <h3 id="stage-title"></h3>
+                <span class="owner" id="stage-owner"></span>
+              </div>
+              <p id="stage-description"></p>
+              <div class="payload">
+                <p id="payload-title"></p>
+                <pre><code id="payload"></code></pre>
+              </div>
+            </div>
+          </div>
+          <div class="simulator-footer">
+            <span id="step-progress" role="status"></span>
+            <div class="step-actions">
+              <button type="button" id="previous">上一步</button>
+              <button class="button-primary" type="button" id="next">下一步</button>
+            </div>
+          </div>
+        </div>
+
+        <noscript>
+          <ol class="static-example">
+            <li>用户问「北京现在的天气怎么样？」Harness 将问题和 <code>get_weather</code> 的工具定义提供给模型。</li>
+            <li>模型请求调用 <code>get_weather</code>，参数为「北京」。</li>
+            <li>Harness 检查并执行工具。模拟结果为晴、22°C。工具也可能返回超时。</li>
+            <li>Harness 将调用和结果写入会话，再把从日志生成的消息发给模型。</li>
+            <li>模型根据数据回答。如果收到超时信息，示例回复会说明无法获取当前天气。如果模型直接生成文本且没有继续条件，本轮可以在第一次推理后结束。</li>
+          </ol>
+        </noscript>
+        <p class="demo-note">演示使用简化字段和固定数据，同一条模型回复可以发起多次工具调用。<sup><a href="#ref-api" aria-label="来源 4">[4]</a></sup></p>
+      </div>
     </section>
 
     <section id="perspectives" class="frame perspective-section" aria-labelledby="perspectives-title">
@@ -91,7 +164,7 @@
           <h4>工具超时，或者根本用不到工具</h4>
           <p>天气查询超时时，演示中的模型会说明暂时无法确认。像「摄氏度怎样换算成华氏度」这样的问题，模型可以直接用公式回答。此时通常一次调用模型就够了。</p>
         </div>
-        <a class="perspective-demo-link" href="#demo">试试交互演示 ↓</a>
+        <a class="perspective-demo-link" href="#demo">试试交互演示 ↑</a>
       </section>
 
       <section id="architecture" class="perspective-panel" aria-labelledby="architecture-title">
@@ -160,64 +233,8 @@ turn/end</code></pre>
           <h4>排查时先看停在哪一步</h4>
           <p>看不到查询请求，先检查工具声明是否进入模型请求。已经有 <code>tool/call</code>，就按同一编号跟到 <code>tool/result</code>，看执行、超时或拒绝情况。结果正常但回复没有用到数据时，继续核对下一步实际发送的消息历史和最后生成的回复。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup><sup><a href="#ref-tools" aria-label="来源 2">[2]</a></sup></p>
         </div>
-        <a class="perspective-demo-link" href="#demo">在演示中查看输入和输出 ↓</a>
+        <a class="perspective-demo-link" href="#demo">在演示中查看输入和输出 ↑</a>
       </section>
-    </section>
-
-    <section id="demo" class="demo-section" aria-labelledby="demo-title">
-      <div class="frame">
-        <h2 id="demo-title">跟着一次工具调用走</h2>
-        <p class="section-intro">选择场景，逐步查看每个阶段的输入和输出。这里使用固定数据和简化后的事件字段。</p>
-
-        <div class="simulator" data-simulator hidden>
-          <div class="simulator-top">
-            <div class="scenario">
-              <label for="scenario">演示场景</label>
-              <select id="scenario">
-                <option value="success">查询成功</option>
-                <option value="timeout">工具超时</option>
-                <option value="partial">两城查询，部分成功</option>
-                <option value="direct">直接回答</option>
-              </select>
-            </div>
-            <p class="question"><span>用户输入</span> <strong id="question"></strong></p>
-          </div>
-          <div class="simulator-body">
-            <nav class="step-nav" aria-label="模拟执行步骤">
-              <ol id="steps"></ol>
-            </nav>
-            <div class="stage">
-              <div class="stage-heading">
-                <h3 id="stage-title"></h3>
-                <span class="owner" id="stage-owner"></span>
-              </div>
-              <p id="stage-description"></p>
-              <div class="payload">
-                <p id="payload-title"></p>
-                <pre><code id="payload"></code></pre>
-              </div>
-            </div>
-          </div>
-          <div class="simulator-footer">
-            <span id="step-progress" role="status"></span>
-            <div class="step-actions">
-              <button type="button" id="previous">上一步</button>
-              <button class="button-primary" type="button" id="next">下一步</button>
-            </div>
-          </div>
-        </div>
-
-        <noscript>
-          <ol class="static-example">
-            <li>用户问「北京现在的天气怎么样？」Harness 将问题和 <code>get_weather</code> 的工具定义提供给模型。</li>
-            <li>模型请求调用 <code>get_weather</code>，参数为「北京」。</li>
-            <li>Harness 检查并执行工具。模拟结果为晴、22°C。工具也可能返回超时。</li>
-            <li>Harness 将调用和结果写入会话，再把从日志生成的消息发给模型。</li>
-            <li>模型根据数据回答。如果收到超时信息，示例回复会说明无法获取当前天气。如果模型直接生成文本且没有继续条件，本轮可以在第一次推理后结束。</li>
-          </ol>
-        </noscript>
-        <p class="demo-note">演示使用同一个自定义天气工具，可以在一条模型回复里调用多次。工具输出与模型回复均为模拟数据。<sup><a href="#ref-api" aria-label="来源 4">[4]</a></sup></p>
-      </div>
     </section>
 
     <section id="references" class="frame reading-section" aria-labelledby="references-title">
