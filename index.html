@@ -6,6 +6,7 @@
   <meta name="description" content="浏览和搜索理解万物的所有原理主题。">
   <title>理解万物 · 主题目录</title>
   <script defer src="assets/catalog.js"></script>
+  <script defer src="assets/pageviews.js"></script>
   <style>
     :root {
       color-scheme: light;
@@ -185,6 +186,13 @@
       border-radius: .85rem;
       color: var(--muted);
     }
+
+    .catalog-footer {
+      padding-block: 1rem;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: .875rem;
+    }
   </style>
 </head>
 <body>
@@ -232,5 +240,10 @@
       </ul>
     </section>
   </main>
+  <footer class="catalog-footer">
+    <div class="frame">
+      <p data-pageviews="site">全站浏览量（PV） <span data-pv-value aria-live="polite">—</span></p>
+    </div>
+  </footer>
 </body>
 </html>

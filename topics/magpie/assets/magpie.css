@@ -1534,6 +1534,9 @@ h4 {
   margin: 0.7em 0;
   padding-inline-start: 1.4em;
 }
+.reader-questions .architecture-grid {
+  margin-top: 0.85em;
+}
 .request-walkthrough li + li,
 .reader-questions li + li,
 .reader-questions p,
@@ -1541,7 +1544,8 @@ h4 {
   margin-top: 0.7em;
 }
 .request-walkthrough a,
-.reader-questions a {
+.reader-questions a,
+.explanation-pair a {
   margin-inline-start: 0.35em;
   color: var(--green);
   text-decoration: underline;

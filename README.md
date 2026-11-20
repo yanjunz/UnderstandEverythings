@@ -9,4 +9,6 @@
 
 在仓库根目录运行 `python3 -m http.server 8000`，然后打开 [主题目录](http://localhost:8000/)，按标题、简介或关键词查找主题。
 
+正式站的首页显示全站 PV，主题页显示本页 PV。全站数值是首页与当前收录主题的浏览量之和。计数由 Abacus 保存，统计从上线后开始，每次加载正式站页面计一次。正式站地址在 `assets/pageviews.js` 中配置。[Abacus 文档](https://v2.jasoncameron.dev/abacus/)
+
 新增主题请参阅[主题网页贡献指南](CONTRIBUTING.md)，其中包含目录约定、写作模板和验收清单。

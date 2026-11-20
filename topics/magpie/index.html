@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="assets/magpie.css" />
     <script defer src="../../assets/perspectives.js"></script>
     <script defer src="assets/magpie.js"></script>
+    <script defer src="../../assets/pageviews.js"></script>
   </head>
   <body>
     <a href="#main" class="skip-link">跳到主要内容</a>
@@ -345,6 +346,9 @@ model: deepseek/deepseek-chat
                   Magpie 按不同 Agent
                   的配置格式，修改模型、基础地址等必要字段，让请求先发到本地网关。各
                   Agent 的具体接入方式不同，通常需要新会话或重启相关应用。
+                  <a href="#agent-gateway-auth"
+                    >查看 Codex、Claude Code 的配置和认证</a
+                  >
                 </p>
               </div>
               <div>
@@ -479,6 +483,7 @@ model: deepseek/deepseek-chat
                     href="#ref-wiring"
                     >Agent wiring</a
                   >
+                  · <a href="#agent-gateway-auth">配置和认证实例</a>
                 </dd>
               </div>
               <div>
@@ -837,6 +842,95 @@ model: deepseek/deepseek-chat
           aria-labelledby="questions-heading"
         >
           <h2 id="questions-heading">读者问题</h2>
+          <article id="agent-gateway-auth">
+            <h3>
+              Magpie 怎么改 Codex、Claude Code 的
+              Gateway？原网关地址和凭据从哪里来？
+            </h3>
+            <p>
+              <strong>这里改的是 Agent 用来发模型请求的基础地址。</strong> Agent
+              已支持自定义服务入口，Magpie
+              为它填入一个新的地址和对应的入口凭据。新请求由 Agent 主动发到
+              Magpie。原来的网关继续在原地址运行，Magpie
+              的接入逻辑还会记录改过的设置，以便断开时恢复。<a
+                href="#ref-wiring"
+                >Agent 接入实现</a
+              >
+            </p>
+            <dl class="architecture-grid">
+              <div>
+                <dt>Codex 改哪里</dt>
+                <dd>
+                  以选择 Magpie 自定义 provider 的接法为例，Codex 配置中的
+                  <code>[model_providers.magpie]</code> 使用
+                  <code>base_url = "http://127.0.0.1:3425/v1"</code>、<code
+                    >wire_api = "responses"</code
+                  >
+                  和发给 Magpie 的 Bearer token。启用该 provider
+                  后，模型请求发到本机的 <code>/v1/responses</code>。<a
+                    href="#ref-codex-wiring"
+                    >Codex 配置源码</a
+                  >
+                </dd>
+              </div>
+              <div>
+                <dt>Claude Code 改哪里</dt>
+                <dd>
+                  普通网关接入会设置 <code>settings.json</code> 的
+                  <code>env.ANTHROPIC_BASE_URL</code> 为
+                  <code>http://127.0.0.1:3425</code>，并配置面向 Magpie 的
+                  <code>ANTHROPIC_AUTH_TOKEN</code>。Claude Code 继续使用
+                  Messages 协议，向新地址发
+                  <code>/v1/messages</code
+                  >。接入是否生效还取决于实际生效的配置，企业托管配置可有更高优先级。<a
+                    href="#ref-claude-wiring"
+                    >Claude Code 配置源码</a
+                  >
+                  · <a href="#ref-wiring">接入文档</a>
+                </dd>
+              </div>
+              <div>
+                <dt>原来的网关在哪里</dt>
+                <dd>
+                  如果 Agent 原本已有自定义地址，支持该 Agent
+                  的适配器可以读取它写在配置里的地址。Magpie
+                  自己要连接的上游则来自供应商预设、手工添加的 Base
+                  URL，或受支持账号的接入逻辑。对一个此前未知的私有
+                  Gateway，需要知道它的地址、协议和可用凭据，再按兼容接口接入。<a
+                    href="#ref-wiring"
+                    >配置读写</a
+                  >
+                  · <a href="#ref-providers">供应商设置</a>
+                </dd>
+              </div>
+            </dl>
+            <pre class="flow-code"><code>改地址之前
+  Agent ── 原服务的凭据 ──→ 原服务
+
+改地址之后
+  Agent ── Magpie 入口的凭据或本机访问策略 ──→ Magpie
+  Magpie ── 所选上游的 API key 或已授权账号 ──→ 上游服务</code></pre>
+            <p>
+              <strong>换地址以后，上游仍然鉴权。</strong> Magpie
+              的本机入口按自己的访问策略接收调用，跨机器共享时要按共享配置提供
+              Gateway key。Magpie
+              发往上游时，使用该供应商配置的凭据，举例来说可以是 Bearer API
+              key，也可以是 Anthropic 接口使用的
+              <code>x-api-key</code
+              >。受支持的订阅使用已登录的账号和相应接入逻辑，比如 Codex 的
+              ChatGPT 登录账号，或通过本地 <code>claude</code> 进程接通的 Claude
+              订阅。能连上本机入口，只说明第一段链路通了。<a href="#ref-routing"
+                >入口鉴权</a
+              >
+              · <a href="#ref-providers">上游鉴权</a> ·
+              <a href="#ref-claude-bridge">订阅桥接</a>
+            </p>
+            <p>
+              如果你开发的是云端 Agent，<code>127.0.0.1</code> 指 Agent
+              服务实际运行的机器。浏览器界面在用户电脑上，也不会改变后端发请求的位置。此时
+              Agent 的配置要使用它能访问的 Magpie 地址，以及相应的入口凭据。
+            </p>
+          </article>
           <article id="custom-gateway">
             <h3>
               Magpie 怎么知道 Agent 用哪家模型？我的 Agent 和自建 LLM Gateway
@@ -986,11 +1080,45 @@ Magpie 自定义供应商  my-gateway
               </div>
               <b>↗</b>
             </a>
+            <a
+              id="ref-codex-wiring"
+              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/agent/codex.go#L653-L675"
+            >
+              <div>
+                <strong>源码：Codex 接入</strong
+                ><small>向 Codex 写入自定义 provider</small>
+              </div>
+              <b>↗</b>
+            </a>
+            <a
+              id="ref-claude-wiring"
+              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/agent/claude.go#L23-L33"
+            >
+              <div>
+                <strong>源码：Claude Code 接入</strong
+                ><small>基础地址、凭据与模型配置项</small>
+              </div>
+              <b>↗</b>
+            </a>
+            <a
+              id="ref-claude-bridge"
+              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/docs/subsystems/claude-subscription-bridge.md"
+            >
+              <div>
+                <strong>Claude 订阅桥接</strong
+                ><small>本地 Claude Code 进程与订阅请求</small>
+              </div>
+              <b>↗</b>
+            </a>
           </div>
           <a href="sources.md" class="sources-more">完整来源与实现对照 →</a>
         </section>
         <footer class="article-footer">
-          <a href="../../">← 返回主题目录</a><a href="#main">回到顶部 ↑</a>
+          <a href="../../">← 返回主题目录</a>
+          <p data-pageviews="page">
+            本页浏览量（PV） <span data-pv-value aria-live="polite">—</span>
+          </p>
+          <a href="#main">回到顶部 ↑</a>
         </footer>
       </main>
     </div>
