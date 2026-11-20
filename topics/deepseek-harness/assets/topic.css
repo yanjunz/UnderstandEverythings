@@ -179,20 +179,38 @@ section[id] { scroll-margin-top: 1.5rem; }
   font-size: clamp(1.15rem, 2.25vw, 1.45rem);
 }
 
-.map-entry, .map-runtime-title {
+.map-paths {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .6rem;
+}
+
+.map-paths > div { display: grid; grid-template-rows: 1fr auto; }
+
+.map-entry {
+  display: grid;
+  align-content: start;
+  gap: .15rem;
+  padding: .5rem .65rem;
+  border: 1px solid #455477;
+  border-radius: .45rem;
+  background: #27345d;
+  font-size: .85rem;
+  line-height: 1.35;
+}
+
+.map-startup .map-entry { border-color: #688eb3; background: #1a3754; }
+.map-startup .map-connection { color: #a7e1fb; }
+.map-entry small { color: #d5def8; font-size: .75rem; }
+
+.map-runtime-title {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: .15rem .8rem;
-}
-
-.map-entry {
-  padding: .45rem .65rem;
-  border: 1px solid #455477;
-  border-radius: .45rem;
-  background: #27345d;
-  font-size: .85rem;
+  padding: .1rem .2rem .55rem;
+  font-size: .9rem;
 }
 
 .map-connection {
@@ -201,18 +219,16 @@ section[id] { scroll-margin-top: 1.5rem; }
   font-size: .75rem;
   text-align: center;
 }
-.map-connection span { margin-inline-start: .65rem; }
-
 .map-runtime {
   padding: .55rem;
   border: 1px solid #7a8bc0;
   border-radius: .7rem;
   background: #1a2543;
 }
-.map-runtime-title { padding: 0 .2rem .4rem; font-size: .9rem; }
 .map-entry span, .map-runtime-title span, .map-note { color: #c1cef8; font-size: .75rem; }
 
 .map-core { display: grid; grid-template-columns: minmax(0, .4fr) minmax(0, 1fr); }
+.map-mobile-connection { display: none; }
 
 .map-driver {
   display: grid;
@@ -228,7 +244,7 @@ section[id] { scroll-margin-top: 1.5rem; }
 
 .map-driver span, .map-services li div span { color: #d5def8; font-size: .73rem; }
 .map-driver code, .map-services code { color: #e0e7ff; font-size: .7rem; }
-.map-driver code { margin-top: .2rem; }
+.map-driver > code { margin-top: .2rem; }
 
 .map-services { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
 .map-services li { display: grid; grid-template-columns: 1.45rem minmax(0, 1fr); }
@@ -248,6 +264,20 @@ section[id] { scroll-margin-top: 1.5rem; }
 }
 .map-services li div span { flex-basis: 100%; }
 
+.map-extension {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .1rem .55rem;
+  margin-top: .45rem;
+  padding: .38rem .55rem;
+  border: 1px dashed #a298d3;
+  border-radius: .4rem;
+  color: #e8dfff;
+  font-size: .75rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .map-dependencies { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; margin-top: .6rem; }
 .map-dependencies div {
   padding: .4rem;
@@ -263,6 +293,47 @@ section[id] { scroll-margin-top: 1.5rem; }
 .map-note { margin-top: .65rem; }
 .map-note a { color: #dae3ff; }
 .map-note a:focus-visible { outline-color: #c1cef8; }
+
+.plugin-section { padding-bottom: clamp(2.5rem, 5vw, 4.5rem); }
+
+.plugin-demo {
+  max-width: 54rem;
+  margin-top: 1.15rem;
+  border: 1px solid var(--line);
+  border-radius: .75rem;
+  background: var(--paper);
+}
+
+.plugin-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem .65rem;
+  min-inline-size: 0;
+  margin: .7rem .85rem;
+  padding: 0;
+  border: none;
+}
+
+.plugin-stages legend { margin-bottom: .4rem; padding: 0; font-size: .85rem; font-weight: 700; }
+
+.plugin-stages label {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  min-height: 2.4rem;
+  padding: .25rem .65rem;
+  border: 1px solid var(--line);
+  border-radius: .45rem;
+  font-size: .85rem;
+  cursor: pointer;
+}
+
+.plugin-stages label:has(:checked) { border-color: var(--accent); background: var(--accent-pale); }
+.plugin-stages input { margin: 0; accent-color: var(--accent); }
+.plugin-demo .motion-board { border: 0; border-radius: 0 0 .75rem .75rem; }
+.plugin-demo .motion-node strong code { color: inherit; font-size: .9rem; }
+.plugin-demo [data-stage="dispose"] [data-flow-node="tools"] { border-style: dashed; }
+.plugin-demo + .demo-note { max-width: 54rem; }
 
 .demo-section {
   border-block: 1px solid var(--line);
@@ -502,7 +573,7 @@ section[id] { scroll-margin-top: 1.5rem; }
 }
 
 .package-name { margin-bottom: .65rem; color: var(--accent-dark); font: 650 .83rem/1.4 var(--mono); }
-.mechanism h4 + p, .plugin-note h4 + p, .trace-example h4 + p { margin-top: .55rem; color: var(--muted); }
+.mechanism h4 + p, .plugin-note > p, .trace-example h4 + p { margin-top: .55rem; color: var(--muted); }
 .mechanism code, .architecture-notes code { overflow-wrap: anywhere; }
 
 .plugin-note {
@@ -530,6 +601,7 @@ section[id] { scroll-margin-top: 1.5rem; }
 .architecture-notes dl { margin: .55rem 0 0; }
 .architecture-notes dt { font-weight: 700; }
 .architecture-notes dd { margin: 0 0 .65rem; color: var(--muted); }
+#design-details dd { margin: .2rem 0 1rem; }
 .references { margin: 1.1rem 0 0; padding-inline-start: 1.45rem; }
 .references li + li { margin-top: .65rem; }
 .references li::marker { color: var(--accent-dark); }
@@ -541,9 +613,12 @@ section[id] { scroll-margin-top: 1.5rem; }
 .site-footer .frame { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem 1rem; }
 .site-footer [data-pageviews] { color: var(--muted); font-size: .875rem; }
 
-@media (max-width: 48rem) {
+@media (max-width: 52rem) {
   .hero { grid-template-columns: 1fr; }
   .hero h1 { font-size: clamp(2.55rem, 9.5vw, 4.5rem); }
+}
+
+@media (max-width: 48rem) {
   .mechanism-grid { grid-template-columns: 1fr; }
 }
 
@@ -559,8 +634,11 @@ section[id] { scroll-margin-top: 1.5rem; }
 
 @media (max-width: 32rem) {
   .map-core { grid-template-columns: minmax(0, 1fr); }
+  .map-mobile-connection { display: block; padding: .25rem 0; color: #c1cef8; font-size: .75rem; text-align: center; }
   .map-services { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .map-services li { grid-template-columns: minmax(0, 1fr); }
-  .map-edge { font-size: 0; }
-  .map-edge::before { content: "↕"; font-size: .875rem; }
+  .map-edge { display: none; }
+  .plugin-demo .motion-lane { grid-template-columns: minmax(0, 1fr) 1rem minmax(0, 1fr) 1rem minmax(0, 1fr); }
+  .plugin-demo .motion-node { padding-inline: .25rem; }
+  .plugin-demo .motion-node strong code { font-size: .75rem; }
 }
