@@ -21,6 +21,7 @@
         理解万物
       </a>
       <nav aria-label="页内导航">
+        <a href="#system-architecture">架构图</a>
         <a href="#perspectives">讲解视角</a>
         <a href="#demo">交互演示</a>
         <a href="#references">参考资料</a>
@@ -34,32 +35,65 @@
         <p class="eyebrow">智能体工程</p>
         <h1 id="page-title">DeepSeek<br><span>Harness 原理</span></h1>
         <p class="hero-lead">你问「北京现在的天气怎么样？」，模型怎么拿到最新数据？DeepSeek Harness（<code>dsh</code>）是 DeepSeek 开源的智能体运行时，负责把模型、工具和它们交换的信息接起来。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></p>
-        <a class="primary-action" href="#demo">观看核心动画 <span aria-hidden="true">↓</span></a>
+        <div class="hero-actions">
+          <a class="primary-action" href="#system-architecture">查看架构图 <span aria-hidden="true">↘</span></a>
+          <a href="#demo">观看核心动画</a>
+        </div>
       </div>
 
-      <figure class="flow">
-        <figcaption>一轮执行的数据流</figcaption>
-        <div class="flow-node flow-model">
-          <span class="flow-glyph" aria-hidden="true">✦</span>
-          <div><strong>DeepSeek 模型</strong><span>根据上下文生成回复或工具请求</span></div>
+      <figure class="architecture-map" id="system-architecture" aria-labelledby="system-architecture-title">
+        <figcaption><h2 id="system-architecture-title">dsh 系统架构图</h2></figcaption>
+        <div class="map-entry">
+          <span>应用入口</span><strong>Web · Headless · SDK · ACP</strong>
         </div>
-        <div class="flow-link">
-          <span>上下文 ↑</span><span>工具请求 ↓</span>
+        <p class="map-connection">提交任务 ↓ <span>↑ 读取会话与状态</span></p>
+
+        <div class="map-runtime">
+          <div class="map-runtime-title">
+            <strong>Cordis 运行时</strong>
+            <span><code>profile</code> 选择并组装插件</span>
+          </div>
+          <div class="map-core">
+            <div class="map-driver">
+              <strong>Agent 循环</strong>
+              <code>ctx.agents</code>
+              <span>Agent 接口与注册表</span>
+              <code>ctx.agentLoop</code>
+              <span>默认回合驱动器</span>
+            </div>
+            <ul class="map-services" role="list" aria-label="Agent 循环使用的服务">
+              <li>
+                <span class="map-edge" aria-hidden="true">↔</span>
+                <div><strong>提示词组装</strong><code>ctx.systemPrompt</code><span>获取提示词与工具声明</span></div>
+              </li>
+              <li>
+                <span class="map-edge" aria-hidden="true">↔</span>
+                <div><strong>模型适配</strong><code>ctx.llm</code><span>发起推理、接收响应流</span></div>
+              </li>
+              <li>
+                <span class="map-edge" aria-hidden="true">↔</span>
+                <div><strong>工具注册与执行</strong><code>ctx.tools</code><span>按作用域分派、返回结果</span></div>
+              </li>
+              <li>
+                <span class="map-edge" aria-hidden="true">↔</span>
+                <div><strong>会话日志</strong><code>ctx.sessions</code><span>追加事件、从日志重建历史</span></div>
+              </li>
+            </ul>
+          </div>
         </div>
-        <div class="flow-node flow-loop">
-          <span class="flow-glyph" aria-hidden="true">↻</span>
-          <div><strong>Harness · Agent 循环</strong><span>组装输入，执行一轮，再决定是否继续</span></div>
-        </div>
-        <div class="flow-branches">
+
+        <div class="map-dependencies" role="group" aria-label="运行时依赖">
           <div>
-            <div class="flow-link"><span>读取与追加 ↕</span></div>
-            <div class="flow-node"><div><strong>会话日志</strong><span>保留消息和事件</span></div></div>
+            <span>模型适配 ↕</span><strong>模型 API</strong>
           </div>
           <div>
-            <div class="flow-link"><span>调用与回填 ↕</span></div>
-            <div class="flow-node flow-tool"><div><strong>工具插件</strong><span>执行并返回结果</span></div></div>
+            <span>工具执行 ↕</span><strong>执行环境或工具服务</strong>
+          </div>
+          <div>
+            <span>会话持久化 ↕</span><strong>存储后端，例如 JSONL</strong>
           </div>
         </div>
+        <p class="map-note">图示聚焦默认 Agent 循环。运行时使用的适配器、工具和存储实现由启动配置决定。<sup><a href="#ref-architecture" aria-label="架构来源 1">[1]</a></sup><sup><a href="#ref-persistence" aria-label="会话持久化来源 5">[5]</a></sup></p>
       </figure>
     </section>
 
@@ -170,6 +204,7 @@
       <section id="architecture" class="perspective-panel" aria-labelledby="architecture-title">
         <h3 id="architecture-title">组件如何协作，状态在哪里流转</h3>
         <p class="section-intro">以下以 dsh 的默认 <code>agent-loop</code> 为范围。<strong>Turn（回合）</strong>覆盖一次任务处理，可以推进多个 <strong>Step（步骤）</strong>。正常路径中的每个步骤都包含一次模型请求，模型也可以在这次请求中提出一批工具调用。示例假设模型支持工具调用，天气工具已在当前作用域注册。<sup><a href="#ref-architecture" aria-label="来源 1">[1]</a></sup></p>
+        <a class="perspective-demo-link" href="#system-architecture">回看架构图 ↑</a>
         <div class="mechanism-grid">
           <article class="mechanism">
             <p class="package-name">core/agent-loop</p>
@@ -239,12 +274,13 @@ turn/end</code></pre>
 
     <section id="references" class="frame reading-section" aria-labelledby="references-title">
       <h2 id="references-title">参考资料</h2>
-      <p class="section-intro">本文依据 <time datetime="2026-11-18">2026 年 11 月 18 日</time>查阅的公开技术预览文档，聚焦默认 <code>agent-loop</code> 的模型发起型工具调用。</p>
+      <p class="section-intro">本文依据 <time datetime="2026-11-20">2026 年 11 月 20 日</time>查阅的公开技术预览文档，聚焦默认 <code>agent-loop</code> 的架构和模型发起型工具调用。</p>
       <ol class="references">
         <li id="ref-architecture"><a href="https://deepseek-harness.github.io/deepseek-harness/reference/">DeepSeek Harness · 架构</a><span>Cordis、插件组合与回合时序</span></li>
         <li id="ref-tools"><a href="https://deepseek-harness.github.io/deepseek-harness/reference/subsystems/tools">DeepSeek Harness · 工具</a><span>注册、执行与工具钩子</span></li>
         <li id="ref-session"><a href="https://deepseek-harness.github.io/deepseek-harness/reference/subsystems/session">DeepSeek Harness · 会话</a><span>追加式事件与消息投影</span></li>
         <li id="ref-api"><a href="https://api-docs.deepseek.com/guides/tool_calls/">DeepSeek API · Tool Calls</a><span>天气工具的接口示例</span></li>
+        <li id="ref-persistence"><a href="https://deepseek-harness.github.io/deepseek-harness/reference/subsystems/persistence">DeepSeek Harness · 会话持久化</a><span>持久化接口与 JSONL 后端</span></li>
       </ol>
     </section>
   </main>
