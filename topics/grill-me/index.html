@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="用读书会报名与候补的交互案例，分析 Matt Pocock 的 grill-me Skill、提问前沿、事实调查和共识确认。">
+  <title>grill-me Skill 原理 · 理解万物</title>
+  <link rel="stylesheet" href="../../assets/flow-motion.css">
+  <link rel="stylesheet" href="assets/topic.css">
+  <script defer src="../../assets/perspectives.js"></script>
+  <script defer src="../../assets/flow-motion.js"></script>
+  <script defer src="assets/demo.js"></script>
+  <script defer src="../../assets/pageviews.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="site-header">
+    <div class="frame header-inner">
+      <a class="brand" href="../../"><span aria-hidden="true">理</span>理解万物</a>
+      <nav aria-label="页内导航">
+        <a href="#system-architecture">架构图</a>
+        <a href="#interview-demo">交互演示</a>
+        <a href="#perspectives">讲解视角</a>
+        <a href="#references">参考资料</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero frame" aria-labelledby="page-title">
+      <div class="hero-copy">
+        <h1 id="page-title">grill-me <span>Skill 原理</span></h1>
+        <p class="hero-lead">「给读书会做一个报名页。」如果名额满了，要开放候补吗？只有先知道这个答案，才值得讨论怎么补位。Matt Pocock 的 <code>/grill-me</code> 把这样的依赖整理成设计树，按轮推进，直到你和 Agent 对方案达成共识。<sup><a href="#ref-entry" aria-label="来源 1">[1]</a></sup><sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></p>
+        <div class="hero-actions">
+          <a class="primary-link" href="#interview-demo">试一次设计访谈</a>
+          <a href="#system-architecture">查看架构图</a>
+        </div>
+      </div>
+
+      <figure id="system-architecture" class="architecture-map" aria-labelledby="map-title">
+        <figcaption><h2 id="map-title">入口、访谈循环与共识确认</h2></figcaption>
+        <div class="map-box map-entry"><strong><code>/grill-me</code> → <code>grilling</code></strong><span>用户触发入口，宿主加载访谈 Skill</span></div>
+        <p class="map-arrow">↓ 根据当前回答和事实，找出前置条件已满足的问题</p>
+        <div class="map-fork">
+          <div class="map-box"><strong>Agent 调查事实</strong><span>子 Agent 查环境，返回结果</span></div>
+          <div class="map-box"><strong>用户作设计决定</strong><span>同轮问题附建议，等用户作答</span></div>
+        </div>
+        <p class="map-arrow">↓ 更新设计树 · 有待答问题时进入下一轮 ↺</p>
+        <div class="map-box map-exit"><strong>剩余分支已解决 → 等待用户确认</strong><span>仍在调查的必要事实继续等待</span></div>
+        <p class="map-note">设计树和每轮能问的问题均由 Agent 根据对话推断。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-loop-doc" aria-label="来源 3">[3]</a></sup></p>
+      </figure>
+    </section>
+
+    <section id="interview-demo" class="demo-section" aria-labelledby="demo-title">
+      <div class="frame">
+        <h2 id="demo-title">读书会报名要不要开放候补？</h2>
+        <p class="section-intro">扮演活动组织者，回答这一轮的设计问题。再让模拟仓库返回事实，看看哪些问题会被解锁，哪些分支会被跳过。</p>
+        <div id="interview" class="interview" hidden>
+          <div class="motion-board" id="interview-motion">
+            <div class="motion-lane">
+              <div class="motion-node" data-flow-node="repo"><strong>仓库调查</strong><span>后台执行能力</span></div>
+              <div class="motion-edge" data-flow-link="fact" aria-hidden="true"><span class="motion-packet"></span></div>
+              <div class="motion-node" data-flow-node="agent"><strong>Agent</strong><span>整理前沿与建议</span></div>
+              <div class="motion-edge" data-flow-link="question" aria-hidden="true"><span class="motion-packet"></span></div>
+              <div class="motion-node" data-flow-node="user"><strong>组织者</strong><span>作答与确认</span></div>
+            </div>
+            <p class="motion-caption" id="motion-caption" role="status"></p>
+          </div>
+          <div class="interview-body">
+            <div class="interview-main">
+              <h3 id="round-title" tabindex="-1"></h3>
+              <p id="round-description" class="section-intro"></p>
+              <form id="round-form">
+                <div id="questions"></div>
+                <button class="action-button" type="submit">提交本轮回答</button>
+              </form>
+              <button id="confirm" class="action-button" type="button" hidden>确认已达成共识</button>
+              <button id="restart" class="secondary-button" type="button">重新开始</button>
+            </div>
+            <aside class="interview-aside" aria-labelledby="dependency-title">
+              <h3 id="dependency-title">问题依赖</h3>
+              <ul id="decision-status" class="decision-status">
+                <li data-decision="queue"><span>是否开放候补</span><strong></strong></li>
+                <li data-decision="reminder"><span>是否发送提醒</span><strong></strong></li>
+                <li data-decision="timing"><span>提醒时间 ← 发送提醒</span><strong></strong></li>
+                <li data-decision="promotion"><span>补位方式 ← 开放候补＋仓库事实</span><strong></strong></li>
+                <li data-decision="hold"><span>补位保留多久 ← 自动补位</span><strong></strong></li>
+              </ul>
+              <div class="fact-panel">
+                <h4>模拟仓库调查</h4>
+                <p id="fact-status"></p>
+                <div id="fact-controls">
+                  <button class="secondary-button" type="button" value="available">返回：已有后台任务能力</button>
+                  <button class="secondary-button" type="button" value="missing">返回：缺少后台任务能力</button>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+        <template id="question-template">
+          <fieldset class="question">
+            <legend></legend>
+            <p class="recommendation"></p>
+            <div class="choice-list"></div>
+          </fieldset>
+        </template>
+        <noscript>
+          <ol class="steps">
+            <li>第一轮可同时问是否开放候补、是否提醒已确认的参与者。</li>
+            <li>同意发送提醒后可决定提前多久。仓库调查还在进行时，自动补位暂缓，提醒仍可继续讨论。</li>
+            <li>开放候补且调查完成后可决定自动还是手动补位。若选择自动补位，再问给候补者保留名额多久。</li>
+            <li>满额即关闭会跳过补位整条分支。相关决策都解决后，由用户确认共识。</li>
+          </ol>
+        </noscript>
+        <p class="demo-note">教学模拟。人工作答推动轮次，侧栏按钮仅模拟工具返回；现场问题由模型判断，演示用固定依赖来展示机制。范围限于候补和提醒。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></p>
+      </div>
+    </section>
+
+    <section id="perspectives" class="frame reading-section" aria-labelledby="perspectives-title">
+      <h2 id="perspectives-title">两种讲解视角</h2>
+      <div class="perspective-choices" data-perspective-tabs aria-labelledby="perspectives-title">
+        <a id="beginner-tab" href="#beginner"><strong>初学者</strong><span>跟着一次报名决策理解追问顺序</span></a>
+        <a id="architect-tab" href="#architect"><strong>架构师</strong><span>分析 Skill 边界、依赖和停止条件</span></a>
+      </div>
+
+      <section id="beginner" class="perspective-panel" aria-labelledby="beginner-title">
+        <h3 id="beginner-title">先问会改变后续的问题</h3>
+        <p><code>/grill-me</code> 是做设计访谈的 Skill。你只要说出想做什么，Agent 就会把可能影响方案的选择列出来。它给建议，由你决定。如果你说「满额即关闭」，后面就跳过怎么补位和给候补者保留多久。<sup><a href="#ref-guide" aria-label="来源 4">[4]</a></sup></p>
+        <ol class="steps">
+          <li><strong>先问能独立回答的。</strong>「要候补吗？」和「要提醒已经报名成功的人吗？」互不影响，可以一轮问完。当前所有能问的问题合称<strong>前沿</strong>。</li>
+          <li><strong>先查现有能力。</strong>你同意候补。Agent 去查仓库有没有后台任务能力，回来后才有依据建议自动或手动补位。提醒提前多久可以先定。</li>
+          <li><strong>按答案打开下一层。</strong>你选自动补位，才出现「给下一位候补者保留多久？」选手动则略过示例里的自动保留时限。</li>
+          <li><strong>最后核对共识。</strong>没有待答问题、相关调查也到齐时，核对双方理解是否一致。Agent 等你确认后才可据此行动。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></li>
+        </ol>
+        <div class="callout">
+          <h4>哪些问题适合留到原型？</h4>
+          <p>例如候补页面应该怎样排版，光描述可能选不出来。作者文档建议先做可丢弃的原型，用实际体验产生新事实，再回到访谈作决定。<sup><a href="#ref-guide" aria-label="来源 4">[4]</a></sup></p>
+        </div>
+      </section>
+
+      <section id="architect" class="perspective-panel" aria-labelledby="architect-title">
+        <h3 id="architect-title">把问答看成逐轮解依赖</h3>
+        <p>上游由入口和可复用访谈规则组成。入口 <code>grill-me/SKILL.md</code> 用 <code>disable-model-invocation: true</code> 标明用户触发，并要求通过 <code>Skill</code> 工具加载 <code>grilling</code>。只装入口时，共用访谈 Skill 仍需由宿主发现和加载。<sup><a href="#ref-entry" aria-label="来源 1">[1]</a></sup><sup><a href="#ref-loop-doc" aria-label="来源 3">[3]</a></sup></p>
+        <dl class="design-list">
+          <div>
+            <dt>前沿由已确认的前置条件决定</dt>
+            <dd>一轮收集所有当前适用且依赖已满足的决定。若补位方式仍未选，保留多久就属于后续轮次，即使「开放候补」已经确定。上游叫它设计树。读书会示例的补位方式同时依赖一个用户决定和一个工具事实，架构上可把它理解为带条件的依赖关系。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></dd>
+          </div>
+          <div>
+            <dt>查询事实和作决定是两条路径</dt>
+            <dd>上游要求在新的上下文中派子 Agent 调查环境。例如查能否运行后台任务。没有调查结果时，只有补位方式和下游受阻；提醒时间还在前沿。查到后台执行能力缺失，结论是「自动化需要额外开发」，是否扩大本期范围仍由用户决定。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></dd>
+          </div>
+          <div>
+            <dt>建议的措辞让决定可确认、可反驳</dt>
+            <dd>每个问题有编号、题目和建议。源码规定把问句写成回答「是」就接受建议的形式，例如缺少后台任务时问「本期由组织者手动补位吗？」。用户仍可以选择新增自动化。回答更新假设；发现一项决定依赖了错误前提时，应重新打开受影响的分支。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-loop-doc" aria-label="来源 3">[3]</a></sup></dd>
+          </div>
+          <div>
+            <dt>暂时问不了与已结束需要区分</dt>
+            <dd>调查未完成时，可能暂时没有能问的问题，但相关分支仍未解决。分支全部处理后才进入共识确认。确认属于提示词规定的行为，宿主和模型的能力会影响执行效果。作者文档指出，前沿由模型判断，有时会漏掉题目间的依赖。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-loop-doc" aria-label="来源 3">[3]</a></sup></dd>
+          </div>
+        </dl>
+        <div class="callout">
+          <h4>落盘由哪个 Skill 负责？</h4>
+          <p><code>grill-me</code> 的共享理解留在对话中。需要把领域词汇和架构决定留给项目后续使用时，<code>grill-with-docs</code> 会同时调用 <code>grilling</code> 和 <code>domain-modeling</code>，维护 <code>GLOSSARY.md</code> 和 ADR（架构决策记录）。<sup><a href="#ref-guide" aria-label="来源 4">[4]</a></sup><sup><a href="#ref-docs-variant" aria-label="来源 6">[6]</a></sup></p>
+        </div>
+      </section>
+    </section>
+
+    <section id="reader-questions" class="frame reading-section" aria-labelledby="reader-title">
+      <h2 id="reader-title">读者问题</h2>
+      <dl class="design-list">
+        <div>
+          <dt>grill-me 的原理是什么？</dt>
+          <dd>按依赖组织设计访谈。Agent 把可以查证的事实交给工具调查，把可决定的问题按轮交给用户，收到答案后再重算下一轮。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></dd>
+        </div>
+        <div>
+          <dt>为什么有的版本一次只问一题？</dt>
+          <dd>早期 <code>grill-me</code> 正文明确要求一次问一题。本文固定的上游版本已把访谈抽到 <code>grilling</code>，按前沿成轮提问。相依问题依旧分轮。作者文档仍给出了在 <code>CLAUDE.md</code> 中声明逐题偏好的方式。<sup><a href="#ref-classic" aria-label="来源 5">[5]</a></sup><sup><a href="#ref-loop-doc" aria-label="来源 3">[3]</a></sup></dd>
+        </div>
+      </dl>
+    </section>
+
+    <section id="references" class="frame reading-section" aria-labelledby="references-title">
+      <h2 id="references-title">参考资料</h2>
+      <p class="section-intro">基于 Matt Pocock 的 <code>mattpocock/skills</code> 源码，固定于 <code>abeeaf9</code>，查阅于 <time datetime="2026-11-24">2026 年 11 月 24 日</time>。</p>
+      <ol class="references">
+        <li id="ref-entry"><a href="https://github.com/mattpocock/skills/blob/abeeaf95660ba9e8b7c753eb38f441ca707a8823/skills/productivity/grill-me/SKILL.md"><code>grill-me/SKILL.md</code> 用户入口</a></li>
+        <li id="ref-loop"><a href="https://github.com/mattpocock/skills/blob/abeeaf95660ba9e8b7c753eb38f441ca707a8823/skills/productivity/grilling/SKILL.md"><code>grilling/SKILL.md</code> 访谈规则</a></li>
+        <li id="ref-loop-doc"><a href="https://github.com/mattpocock/skills/blob/abeeaf95660ba9e8b7c753eb38f441ca707a8823/docs/productivity/grilling.md">作者文档 · 提问前沿、调查和执行边界</a></li>
+        <li id="ref-guide"><a href="https://github.com/mattpocock/skills/blob/abeeaf95660ba9e8b7c753eb38f441ca707a8823/docs/productivity/grill-me.md">作者文档 · grill-me 使用范围</a></li>
+        <li id="ref-classic"><a href="https://github.com/mattpocock/skills/blob/62f43a18177be6ec82da242e59ffbc490a4c22ea/skills/productivity/grill-me/SKILL.md">早期实现 · 一次只问一题</a></li>
+        <li id="ref-docs-variant"><a href="https://github.com/mattpocock/skills/blob/abeeaf95660ba9e8b7c753eb38f441ca707a8823/skills/engineering/grill-with-docs/SKILL.md"><code>grill-with-docs/SKILL.md</code></a>、<a href="https://github.com/mattpocock/skills/blob/abeeaf95660ba9e8b7c753eb38f441ca707a8823/docs/engineering/grill-with-docs.md">项目文档如何记录访谈结果</a></li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="frame">
+      <a href="../../">返回主题目录</a>
+      <p data-pageviews="page">本页浏览量（PV） <span data-pv-value aria-live="polite">—</span></p>
+    </div>
+  </footer>
+</body>
+</html>
