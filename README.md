@@ -6,6 +6,7 @@
 
 - [DeepSeek Harness 原理](topics/deepseek-harness/index.html)从一次天气查询入手，展示上下文组装、工具调用和回合结束。
 - [Magpie 的运行原理](topics/magpie/index.html)跟踪一次模型请求，展示网关接入、协议转换、路由和故障切换。
+- [pstack Skill 原理](topics/pstack/index.html)跟着一次故障修复，理解会话路由、Playbook、子 Agent 分工和验证证据。
 
 在仓库根目录运行 `python3 -m http.server 8000`，然后打开 [主题目录](http://localhost:8000/)，按标题、简介或关键词查找主题。
 
