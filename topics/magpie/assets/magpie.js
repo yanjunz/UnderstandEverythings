@@ -5,68 +5,147 @@
   const $$ = (selector) => [...document.querySelectorAll(selector)];
 
   const prompt = "解释一下这个函数";
+  const deepSeek = {
+    name: "DeepSeek",
+    id: "deepseek",
+    baseUrl: "https://api.deepseek.com",
+    model: "deepseek-chat",
+    key: "DeepSeek API key",
+  };
+  const privateGateway = {
+    name: "自建网关",
+    id: "my-gateway",
+    baseUrl: "https://gateway.example.com/v1",
+    model: "team-chat",
+    key: "自建网关的 API key",
+  };
   const agents = {
     claude: {
       name: "Claude Code",
-      baseUrl: "http://127.0.0.1:3425",
+      basePath: "",
       protocol: "Messages",
       endpoint: "/v1/messages",
       setting: "settings.json · env.ANTHROPIC_BASE_URL",
-      credential: "ANTHROPIC_AUTH_TOKEN",
+      credential: "env.ANTHROPIC_AUTH_TOKEN",
     },
     codex: {
       name: "Codex",
-      baseUrl: "http://127.0.0.1:3425/v1",
+      basePath: "/v1",
       protocol: "Responses",
       endpoint: "/v1/responses",
-      setting: "config.toml · [model_providers.magpie].base_url",
+      setting: 'config.toml · model_provider = "magpie"\n[model_providers.magpie].base_url',
       credential: "experimental_bearer_token",
+    },
+    codexLogin: {
+      name: "Codex",
+      basePath: "/backend-api/codex",
+      originalUrl: "https://chatgpt.com/backend-api/codex",
+      protocol: "Responses",
+      endpoint: "/backend-api/codex/responses",
+      setting: "config.toml 顶层 · openai_base_url",
+      credential: "保留内建 OpenAI provider 与 ChatGPT 登录",
+      login: true,
+    },
+    custom: {
+      name: "自研 Agent",
+      basePath: "/v1",
+      originalUrl: privateGateway.baseUrl,
+      protocol: "Chat Completions",
+      endpoint: "/v1/chat/completions",
+      setting: "由开发者修改模型客户端 · baseURL",
+      credential: "客户端 SDK 的 API key 设置",
+      provider: privateGateway,
     },
   };
 
-  function gatewayTrace(agent, upstreamDenied) {
-    return [
+  const outcomes = {
+    success: { shared: false },
+    sharedSuccess: { shared: true },
+    entryDenied: { shared: true, denied: "entry" },
+    unauthorized: { shared: false, denied: "upstream" },
+  };
+
+  function gatewayConnection(agent, outcome) {
+    const provider = agent.provider ?? deepSeek;
+    const address = outcome.shared ? "https://magpie.example.com" : "http://127.0.0.1:3425";
+    const token = outcome.shared ? "<Magpie 共享 Gateway key>" : "magpie";
+    const credential = agent.login ? "<现有 ChatGPT 登录凭据>" : token;
+    const policy = outcome.shared
+      ? "已开启远程共享，校验有效的 Gateway key"
+      : "普通回环模型请求按本机入口规则接收，无需共享 Gateway key";
+    return { provider, credential, policy, baseUrl: address + agent.basePath };
+  }
+
+  function gatewayTrace(agent, outcome, connection) {
+    const { provider, credential, policy, baseUrl } = connection;
+    const modelId = `${provider.id}/${provider.model}`;
+    const entryDenied = outcome.denied === "entry";
+    const upstreamDenied = outcome.denied === "upstream";
+    const presented = entryDenied && !agent.login ? "<错误的 Magpie 共享 Gateway key>" : credential;
+    const setting = agent.login ? agent.credential : `${agent.credential}：${presented}`;
+    const transform = agent.protocol === "Chat Completions"
+      ? "用同一 Chat Completions 协议转发"
+      : `将 ${agent.protocol} 请求转成 Chat Completions`;
+    const entrySteps = [
       {
         short: "原来直连",
         title: "接入前，Agent 直接请求原服务",
         description:
           "Agent 使用原服务的 Base URL 和原服务认可的凭据。请求的目的地由 Agent 的模型客户端配置决定。",
-        code: "当前 Base URL → 原服务地址\n当前凭据 → 原服务的凭据",
+        code: `当前 Base URL：${agent.originalUrl ?? "原服务地址"}\n当前凭据：原服务认可的凭据`,
         caption: `${agent.name} → 原模型服务 · 携带原服务凭据`,
         motion: { nodes: ["agent", "original"], link: "direct" },
       },
       {
         short: "改 Base URL",
-        title: "把 Agent 的模型请求指向本机 Magpie",
-        description:
-          "Magpie 修改 Agent 支持的配置项，并记录原设置供断开时恢复。新地址在 Agent 的配置实际生效后使用。",
-        code: `${agent.setting}\n→ ${agent.baseUrl}\n${agent.credential} → Magpie 入口凭据`,
-        caption: "Agent 的客户端配置生效 · 当前 Base URL 改为本机入口",
+        title: "把 Agent 的模型请求指向 Magpie",
+        description: agent.login
+          ? "这条 Codex 接法改顶层 openai_base_url，保留内建 OpenAI provider 和 ChatGPT 登录。用 Magpie 的模型时，下一跳仍由 Magpie 自己的供应商配置决定。"
+          : agent.provider
+            ? "开发者把自研 Agent 的模型客户端指向 Magpie，再在 Magpie 里把私有 Gateway 配成上游。两处地址分别配置。"
+            : "Magpie 修改受支持 Agent 的配置，并记录原设置供断开时恢复。配置生效后，新请求才走指定地址。",
+        code: `${agent.setting}\n→ ${baseUrl}\n${setting}`,
+        caption: `Agent 的客户端配置生效 · 改走${outcome.shared ? "远程共享" : "本机回环"}入口`,
         motion: { nodes: ["agent", "magpie"] },
       },
       {
         short: "入口收请求",
         title: "第一段，Agent 请求 Magpie",
-        description: `${agent.name} 仍按 ${agent.protocol} 组织请求。它把问题和模型标识送到本机，Magpie 按自己的入口策略接收调用。`,
-        code: `POST ${agent.endpoint}\n入口凭据：Magpie Gateway key 或本机访问策略\nmodel: deepseek/deepseek-chat\n「${prompt}」`,
-        caption: `${agent.name} → Magpie · 使用 Magpie 的入口策略`,
+        description: `${agent.name} 按 ${agent.protocol} 发送消息和模型标识。Magpie 先检查入口规则。${policy}。`,
+        code: `POST ${agent.endpoint}\n发出的入口凭据：${presented}\nmodel: ${modelId}\n「${prompt}」`,
+        caption: `${agent.name} → Magpie · ${outcome.shared ? "检查共享入口凭据" : "本机回环入口接收请求"}`,
         motion: { nodes: ["agent", "magpie"], link: "local" },
       },
+    ];
+    if (entryDenied) {
+      return [...entrySteps, {
+        short: "入口返回 401",
+        title: "Magpie 入口拒绝，未请求上游",
+        description: agent.login
+          ? "这是远程共享入口。原有 ChatGPT 登录凭据不能代替它的共享密钥；实际远程接入应使用 Codex 自定义 provider 和有效的 Gateway key。"
+          : "示例假定远程共享已开启、入口也能连通，只是请求带错了 Gateway key。Magpie 在选路和转发前就返回 401。",
+        code: "Agent → Magpie：入口凭据被拒绝\nMagpie → 上游：未发出请求\nMagpie → Agent：HTTP 401 Unauthorized",
+        caption: `Magpie → ${agent.name} · 入口 401，未请求上游`,
+        denied: "entry",
+        motion: { nodes: ["magpie", "agent"], link: "local", direction: "backward" },
+      }];
+    }
+    return [
+      ...entrySteps,
       {
         short: "查上游配置",
         title: "从 Magpie 的供应商配置确定下一跳",
-        description:
-          "示例直接指定 deepseek/deepseek-chat，Magpie 读取自己存的 DeepSeek 上游地址、协议和凭据。这个地址可来自预设或手工配置。",
-        code: "请求的 model：deepseek/deepseek-chat\n供应商：deepseek\n上游 Base URL：https://api.deepseek.com\n上游模型：deepseek-chat",
+        description: `Magpie 用 ${modelId} 读取自己存的上游地址、协议和凭据。此处选择${agent.provider ? "手工添加的私有 Gateway" : "配置里的 DeepSeek"}。`,
+        code: `请求的 model：${modelId}\n供应商：${provider.id}\n上游 Base URL：${provider.baseUrl}\n上游模型：${provider.model}`,
         caption: "Magpie 查自己的配置 · 确定模型服务地址和认证方式",
         motion: { nodes: ["magpie"] },
       },
       {
         short: "带上游 key",
         title: "第二段，Magpie 用上游凭据请求模型",
-        description: `Magpie 将 ${agent.protocol} 转成示例上游的 Chat Completions 格式，并使用 DeepSeek 认可的 API key。`,
-        code: `${agent.protocol} → Chat Completions\nPOST https://api.deepseek.com/chat/completions\nAuthorization: Bearer <DeepSeek API key>\nmodel: deepseek-chat`,
-        caption: "Magpie → DeepSeek · 携带供应商自己的 API key",
+        description: `Magpie ${transform}，并使用 ${provider.name} 认可的凭据。`,
+        code: `${transform}\nPOST ${provider.baseUrl}/chat/completions\nAuthorization: Bearer <${provider.key}>\nmodel: ${provider.model}`,
+        caption: `Magpie → ${provider.name} · 携带上游配置的 API key`,
         motion: { nodes: ["magpie", "provider"], link: "upstream" },
       },
       {
@@ -75,14 +154,15 @@
           ? "上游独立验凭据，返回 401"
           : "上游验过凭据，开始返回模型回复",
         description: upstreamDenied
-          ? "Agent 已经成功把请求送到本机，DeepSeek 收到的是第二份凭据。这里模拟该凭据无效，上游独立拒绝请求。"
-          : "模型生成回复。Magpie 解码上游流式事件，再按 Agent 使用的协议重组。",
+          ? `Magpie 入口已收到请求。${provider.name} 校验的是发给自己的 API key。这里模拟该凭据无效，上游独立拒绝请求。`
+          : `上游开始回复。Magpie ${agent.protocol === "Chat Completions" ? "按客户端协议返回流式事件" : "解码上游流式事件，再按 Agent 使用的协议重组"}。`,
         code: upstreamDenied
-          ? "Agent → Magpie：入口已接收\nMagpie → DeepSeek：上游凭据无效\nHTTP 401 Unauthorized"
-          : `上游 Chat 流式数据\n→ 内部事件 → ${agent.protocol} 事件`,
+          ? `Agent → Magpie：入口已接收\nMagpie → ${provider.name}：上游凭据无效\nHTTP 401 Unauthorized`
+          : `上游 Chat 流式数据 → ${agent.protocol} 事件`,
         caption: upstreamDenied
-          ? "DeepSeek → Magpie · HTTP 401，第一段成功与第二段拒绝可以同时发生"
-          : "DeepSeek → Magpie · 返回生成的内容与流式事件",
+          ? `${provider.name} → Magpie · HTTP 401，入口接收成功，上游独立拒绝`
+          : `${provider.name} → Magpie · 返回生成的内容与流式事件`,
+        denied: upstreamDenied ? "upstream" : undefined,
         motion: {
           nodes: ["provider", "magpie"],
           link: "upstream",
@@ -95,7 +175,7 @@
           ? "Agent 收到上游鉴权错误"
           : "Agent 收到可读的回复",
         description: upstreamDenied
-          ? "这个演示只有一个上游。Magpie 把失败传回 Agent，此时应核对 DeepSeek 供应商的凭据。"
+          ? `这个演示只有一个上游。Magpie 把失败传回 Agent，此时应核对 ${provider.name} 的上游凭据。`
           : "Agent 展示结果。若回复包含工具调用，普通模型 API 路径中由 Agent 按自身权限处理，并把结果送进下一轮。",
         code: upstreamDenied
           ? "单一上游 · 无备用候选\nMagpie → Agent：返回上游错误"
@@ -103,6 +183,7 @@
         caption: upstreamDenied
           ? `Magpie → ${agent.name} · 上游鉴权失败`
           : `Magpie → ${agent.name} · 返回客户端能读取的回复`,
+        denied: upstreamDenied ? "upstream" : undefined,
         motion: {
           nodes: ["magpie", "agent"],
           link: "local",
@@ -117,6 +198,7 @@
   const outcomeSelect = $("#flow-outcome");
   let flowSteps = [];
   let flowButtons = [];
+  let connection;
   let step = 0;
 
   function renderFlow(index) {
@@ -124,14 +206,17 @@
     const current = flowSteps[step];
     const agent = agents[agentSelect.value];
     flowBoard.dataset.stage = String(step);
-    flowBoard.toggleAttribute(
-      "data-denied",
-      step >= 5 && outcomeSelect.value === "unauthorized",
-    );
+    if (current.denied) flowBoard.dataset.denied = current.denied;
+    else delete flowBoard.dataset.denied;
     $("#direct-lane").hidden = step !== 0;
     $("#gateway-lane").hidden = step === 0;
     $("#flow-credentials").hidden = step === 0;
-    $("#flow-address").textContent = step === 0 ? "原服务地址" : agent.baseUrl;
+    $("#flow-address").textContent = step === 0 ? (agent.originalUrl ?? "原服务地址") : connection.baseUrl;
+    $("#flow-entry-credential").textContent = connection.policy;
+    $("#flow-provider-credential").textContent = current.denied === "entry"
+      ? "未发出请求" : connection.provider.key;
+    $("#flow-provider-state").textContent = current.denied === "entry"
+      ? "未收到请求" : "验证上游凭据";
     $("#flow-step-label").textContent =
       `第 ${step + 1} 步 / 共 ${flowSteps.length} 步`;
     $("#flow-title").textContent = current.title;
@@ -157,9 +242,19 @@
   function loadFlow() {
     stopFlow();
     const agent = agents[agentSelect.value];
-    flowSteps = gatewayTrace(agent, outcomeSelect.value === "unauthorized");
+    outcomeSelect.querySelector('[value="sharedSuccess"]').disabled = agent.login === true;
+    if (agent.login && outcomeSelect.value === "sharedSuccess") outcomeSelect.value = "success";
+    $("#flow-codex-note").hidden = !agent.login;
+    if (agent.login) outcomeSelect.setAttribute("aria-describedby", "flow-codex-note");
+    else outcomeSelect.removeAttribute("aria-describedby");
+    const outcome = outcomes[outcomeSelect.value];
+    connection = gatewayConnection(agent, outcome);
+    flowSteps = gatewayTrace(agent, outcome, connection);
     $("#direct-agent-name").textContent = agent.name;
     $("#gateway-agent-name").textContent = agent.name;
+    $("#flow-gateway-name").textContent = outcome.shared ? "远程 Magpie" : "本机 Magpie";
+    $("#flow-provider-name").textContent = `上游 ${connection.provider.name}`;
+    $("#flow-steps").style.setProperty("--flow-step-count", flowSteps.length);
     flowButtons = flowSteps.map(({ short }, index) => {
       const button = document.createElement("button");
       const number = document.createElement("b");

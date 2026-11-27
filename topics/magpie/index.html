@@ -68,24 +68,19 @@
               <a href="#questions" class="button">读者问题</a>
             </div>
           </div>
-          <div class="hero-art" aria-hidden="true">
-            <div class="orbit orbit-one"></div>
-            <div class="orbit orbit-two"></div>
-            <span class="orbit-dot od-one"></span
-            ><span class="orbit-dot od-two"></span>
-            <div class="hero-agent">&gt;_</div>
-            <div class="hero-core">
-              <svg viewBox="0 0 80 80">
-                <path
-                  d="M21 51 28 28l16 9 12-10 7 5-10 5-4 18-13 7-6-12-18 7z"
-                  fill="currentColor"
-                />
-                <path d="m33 40 13 6-9 9z" fill="#dde6d7" />
-                <circle cx="54" cy="31" r="1.5" fill="#f8f7f2" /></svg
-              ><span>magpie</span>
+          <figure class="hero-route" aria-labelledby="hero-route-title">
+            <figcaption id="hero-route-title">改 Base URL 后，请求从哪里走？</figcaption>
+            <div>
+              <strong>改之前</strong>
+              <span>Agent → 原服务</span>
+              <small>原服务按自己的凭据验身份</small>
             </div>
-            <div class="hero-model">✦</div>
-          </div>
+            <div>
+              <strong>改之后</strong>
+              <span>Agent → Magpie → 所选上游</span>
+              <small>Magpie 执行入口规则，上游独立验证自己的凭据</small>
+            </div>
+          </figure>
         </section>
         <div class="lesson-summary">
           <svg
@@ -126,9 +121,8 @@
             <h2 id="journey-title">改了哪个地址？两段请求各用什么凭据？</h2>
           </div>
           <p class="section-lead">
-            看 Agent 从直连原服务切换到本机
-            Magpie，再跟着同一次请求走到上游。可以切换 Codex 或 Claude
-            Code，也可以模拟上游拒绝认证。
+            看 Claude Code、Codex 或自研 Agent 怎样改模型入口，再跟着请求到上游。
+            切换鉴权场景可以看到 401 由哪一方返回，以及请求有没有离开 Magpie。
           </p>
           <div
             class="experiment flow-experiment"
@@ -140,20 +134,27 @@
                 <label for="flow-agent">Agent</label>
                 <select id="flow-agent">
                   <option value="claude">Claude Code</option>
-                  <option value="codex">Codex</option>
+                  <option value="codex">Codex · 自定义 provider</option>
+                  <option value="codexLogin">Codex · 保留 ChatGPT 登录</option>
+                  <option value="custom">自研 Agent · 私有 Gateway</option>
                 </select>
               </div>
               <div class="flow-select">
-                <label for="flow-outcome">上游结果</label>
+                <label for="flow-outcome">鉴权场景</label>
                 <select id="flow-outcome">
-                  <option value="success">返回回复</option>
-                  <option value="unauthorized">凭据无效，返回 401</option>
+                  <option value="success">本机回环 · 成功</option>
+                  <option value="sharedSuccess">远程共享 · 成功</option>
+                  <option value="entryDenied">远程共享 · Magpie 返回 401</option>
+                  <option value="unauthorized">本机回环 · 上游返回 401</option>
                 </select>
               </div>
               <button type="button" id="flow-play" class="button primary">
                 自动播放
               </button>
             </div>
+            <p id="flow-codex-note" class="flow-wiring-note" hidden>
+              保留 ChatGPT 登录的成功路径适用于本机回环。要演示远程共享成功，请选 Codex 自定义 provider，由它发送共享 Gateway key。
+            </p>
             <div class="motion-board magpie-motion" id="flow-diagram">
               <p class="endpoint-readout">
                 <strong>Agent 当前 Base URL</strong>
@@ -188,7 +189,7 @@
                   <span class="motion-packet"></span>
                 </div>
                 <div class="motion-node" data-flow-node="magpie">
-                  <strong>本机 Magpie</strong><span>接收、选路、转换</span>
+                  <strong id="flow-gateway-name">本机 Magpie</strong><span>接收、选路、转换</span>
                 </div>
                 <div
                   class="motion-edge"
@@ -198,17 +199,17 @@
                   <span class="motion-packet"></span>
                 </div>
                 <div class="motion-node" data-flow-node="provider">
-                  <strong>上游 DeepSeek</strong><span>验证上游凭据</span>
+                  <strong id="flow-provider-name">上游 DeepSeek</strong><span id="flow-provider-state">验证上游凭据</span>
                 </div>
               </div>
               <div class="flow-credentials" id="flow-credentials" hidden>
                 <div>
                   <strong>Agent → Magpie</strong
-                  ><span>本机入口策略或 Magpie Gateway key</span>
+                  ><span id="flow-entry-credential"></span>
                 </div>
                 <div>
                   <strong>Magpie → 上游</strong
-                  ><span>供应商认可的 API key</span>
+                  ><span id="flow-provider-credential"></span>
                 </div>
               </div>
               <p class="motion-caption" id="flow-caption"></p>
@@ -250,20 +251,21 @@
             <ol class="flow-static">
               <li>接入前，Agent 使用原服务的地址和凭据直接调用模型。</li>
               <li>
-                在 Codex 的 provider 或 Claude Code 的 Base URL 设置中选用本机
-                Magpie。Agent 按 Magpie 的入口策略发送请求。
+                Claude Code 改 <code>env.ANTHROPIC_BASE_URL</code>。Codex
+                可选择 Magpie 自定义 provider，或在本机保留 ChatGPT
+                登录并设置顶层 <code>openai_base_url</code>。自研 Agent 改自身客户端配置。
               </li>
               <li>
-                Magpie
-                根据模型标识找出自己配置的上游地址、协议和凭据，再向模型服务发出新请求。
+                普通回环模型请求无需共享密钥。远程共享需要有效的 Gateway key，
+                错钥匙会让 Magpie 在发出任何上游请求之前返回 401。
               </li>
               <li>
-                上游独立验证自己的凭据。入口请求成功后，上游仍可能返回 401。
+                入口接收后，Magpie 按模型标识读取上游地址、协议和凭据。上游用自己的凭据验证请求，仍可能返回 401。
               </li>
             </ol>
           </noscript>
           <p class="flow-sources">
-            动画使用简化请求和示例数据。
+            动画使用简化请求和示例数据。远程示例假定共享已开启，演示地址已配置 HTTPS。
             <a href="#agent-gateway-auth">配置与鉴权实例</a> ·
             <a href="#ref-routing">路由实现</a>
           </p>
@@ -865,11 +867,11 @@
               Gateway？原网关地址和凭据从哪里来？
             </h3>
             <p>
-              <strong>这里改的是 Agent 用来发模型请求的基础地址。</strong> Agent
-              已支持自定义服务入口，Magpie
-              为它填入一个新的地址和对应的入口凭据。新请求由 Agent 主动发到
-              Magpie。原来的网关继续在原地址运行，Magpie
-              的接入逻辑还会记录改过的设置，以便断开时恢复。<a
+              <strong>这里改的是 Agent 用来发模型请求的基础地址。</strong>
+              Claude Code 的普通接法和 Codex 的自定义 provider 接法会把对应地址指向 Magpie，并配置入口 token。
+              Codex 在本机保留 ChatGPT 登录的接法改的是顶层 <code>openai_base_url</code>，
+              仍沿用现有登录凭据。接入后，Agent 主动向 Magpie 发请求。
+              原服务仍可在原地址访问，Magpie 会记录接入设置供断开时恢复。<a
                 href="#ref-wiring"
                 >Agent 接入实现</a
               >
@@ -878,13 +880,18 @@
               <div>
                 <dt>Codex 改哪里</dt>
                 <dd>
-                  以选择 Magpie 自定义 provider 的接法为例，Codex 配置中的
+                  自定义接法选择 <code>model_provider = "magpie"</code>。
+                  Codex 配置中的
                   <code>[model_providers.magpie]</code> 使用
                   <code>base_url = "http://127.0.0.1:3425/v1"</code>、<code
                     >wire_api = "responses"</code
                   >
-                  和发给 Magpie 的 Bearer token。启用该 provider
-                  后，模型请求发到本机的 <code>/v1/responses</code>。<a
+                  和发给 Magpie 的 Bearer token，模型请求发到
+                  <code>/v1/responses</code>。本机保留 ChatGPT 登录的接法仍用内建
+                  OpenAI provider，只把顶层 <code>openai_base_url</code> 指向
+                  <code>http://127.0.0.1:3425/backend-api/codex</code>。
+                  选 Codex 原有模型时可按原路径往 ChatGPT 转发。选择 Magpie 列出的模型时，
+                  由 Magpie 按自己的供应商配置发出上游请求。<a
                     href="#ref-codex-wiring"
                     >Codex 配置源码</a
                   >
@@ -925,18 +932,19 @@
   Agent ── 原服务的凭据 ──→ 原服务
 
 改地址之后
-  Agent ── Magpie 入口的凭据或本机访问策略 ──→ Magpie
+  Agent ── 本机回环规则 / 远程共享 Gateway key ──→ Magpie
   Magpie ── 所选上游的 API key 或已授权账号 ──→ 上游服务</code></pre>
             <p>
-              <strong>换地址以后，上游仍然鉴权。</strong> Magpie
-              的本机入口按自己的访问策略接收调用，跨机器共享时要按共享配置提供
-              Gateway key。Magpie
-              发往上游时，使用该供应商配置的凭据，举例来说可以是 Bearer API
+              <strong>两段各有自己的访问规则。</strong>普通本机回环请求无需共享密钥。
+              <code>magpie</code> 是客户端可填写的普通 token。
+              跨机器共享需要启用共享并提供有效的 Gateway key。已能连接远程共享入口时，
+              错钥匙会在发往上游之前被拒绝。Magpie 发往上游时，使用该供应商配置的凭据，
+              举例来说可以是 Bearer API
               key，也可以是 Anthropic 接口使用的
               <code>x-api-key</code
               >。受支持的订阅使用已登录的账号和相应接入逻辑，比如 Codex 的
               ChatGPT 登录账号，或通过本地 <code>claude</code> 进程接通的 Claude
-              订阅。能连上本机入口，只说明第一段链路通了。<a href="#ref-routing"
+              订阅。若入口收到了请求，但上游拒绝其 API key，仍会在第二段出现 401。<a href="#ref-entry-auth"
                 >入口鉴权</a
               >
               · <a href="#ref-providers">上游鉴权</a> ·
@@ -1099,11 +1107,11 @@ Magpie 自定义供应商  my-gateway
             </a>
             <a
               id="ref-codex-wiring"
-              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/agent/codex.go#L653-L675"
+              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/agent/codex.go#L39-L63"
             >
               <div>
                 <strong>源码：Codex 接入</strong
-                ><small>向 Codex 写入自定义 provider</small>
+                ><small>自定义 provider 和保留 ChatGPT 登录的两种接法</small>
               </div>
               <b>↗</b>
             </a>
@@ -1114,6 +1122,16 @@ Magpie 自定义供应商  my-gateway
               <div>
                 <strong>源码：Claude Code 接入</strong
                 ><small>基础地址、凭据与模型配置项</small>
+              </div>
+              <b>↗</b>
+            </a>
+            <a
+              id="ref-entry-auth"
+              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/lan.go#L551-L556"
+            >
+              <div>
+                <strong>源码：入口鉴权</strong
+                ><small>普通回环与共享入口的接收规则</small>
               </div>
               <b>↗</b>
             </a>

@@ -40,37 +40,43 @@
       <figure class="architecture-map" id="system-architecture" aria-labelledby="map-title">
         <figcaption><h2 id="map-title">从会话启动到验收的架构</h2></figcaption>
         <div class="map-entry">
-          <div><strong>宿主启动会话</strong><span><code>SessionStart</code> 注入路由指令</span></div>
-          <div><strong>显式调用 Skill</strong><span>用户直接指定工作流程</span></div>
+          <div><strong>会话钩子</strong><span><code>SessionStart</code> 把路由规则加入上下文</span></div>
+          <div><strong>用户请求</strong><span>描述任务，或明确指定专门 Skill</span></div>
         </div>
-        <p class="map-connection">↓ 按路由规则或显式请求加载入口</p>
-        <div class="map-core">
-          <strong><code>poteto-mode</code> · 工作流入口</strong>
-          <span>选定 Playbook、登记步骤、按需加载规则</span>
-        </div>
-        <p class="map-connection">↓ 清单规定顺序，子技能和工具完成具体工作</p>
-        <ul class="map-work" role="list">
-          <li><strong>Playbook</strong><span>把复现、定位、修复和复测排进待办</span></li>
-          <li><strong>子技能与子 Agent</strong><span>加载验证规则，分派任务并回传证据</span></li>
+        <p class="map-connection">↓ 模型读请求和路由规则，决定怎么处理</p>
+        <ul class="map-routes" role="list" aria-label="三种任务路径">
+          <li class="map-core"><strong>原因未知的故障</strong><span><code>poteto-mode</code> → Bug fix Playbook → 待办与委派</span></li>
+          <li><strong>单文件小改</strong><span>直接完成小改，在原界面验证</span></li>
+          <li><strong>要求先写测试</strong><span><code>pstack:tdd</code> → 先验证失败原因，再修复并复测</span></li>
         </ul>
-        <p class="map-connection">↕ 通过宿主工具执行，并读取结果</p>
-        <div class="map-evidence"><strong>仓库与实际界面</strong><span>清单、代码 diff、刷新后的通知状态</span></div>
-        <p class="map-note">图中显式调用以 <code>poteto-mode</code> 为例，也可以直接调用 <code>tdd</code> 等专门 Skill。工具可用性和权限由宿主决定。<sup><a href="#ref-hook" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup></p>
+        <p class="map-connection">↕ 模型用宿主工具执行和验收</p>
+        <div class="map-evidence"><strong>实际产物</strong><span>待办、改动、原界面或回归测试的结果</span></div>
+        <p class="map-note">以启用路由钩子的 Claude Code 为例。宿主决定有哪些工具可用。<sup><a href="#ref-hook" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup></p>
       </figure>
     </section>
 
     <section id="workflow-demo" class="demo-section" aria-labelledby="demo-title">
       <div class="frame">
-        <h2 id="demo-title">跟着一次修复看工作流怎么走</h2>
-        <p class="section-intro">用同一条故障报告走五步。切换验收证据，看看同一句「测试通过」什么时候足以支持结论。</p>
+        <h2 id="demo-title">同一个设置页，三种任务怎么走</h2>
+        <p class="section-intro">切换任务，看模型什么时候加载完整流程、什么时候直接处理，以及显式要求 TDD（测试驱动开发）时会加载哪个 Skill。选「原因未知的故障」还可以比较三种验收证据。</p>
         <div class="trace" id="workflow-trace" hidden>
           <div class="trace-controls">
-            <label for="verification">验收证据</label>
-            <select id="verification">
-              <option value="passed">原界面复测通过</option>
-              <option value="unit-only">只有单元测试通过</option>
-              <option value="reproduced">原界面仍能复现</option>
-            </select>
+            <div class="trace-field">
+              <label for="task">任务输入</label>
+              <select id="task">
+                <option value="bug">原因未知的故障</option>
+                <option value="small">单文件小改</option>
+                <option value="tdd">显式要求 TDD</option>
+              </select>
+            </div>
+            <div class="trace-field" id="verification-field">
+              <label for="verification">验收证据</label>
+              <select id="verification">
+                <option value="passed">原界面复测通过</option>
+                <option value="unit-only">只有单元测试通过</option>
+                <option value="reproduced">原界面仍能复现</option>
+              </select>
+            </div>
             <button type="button" id="play">自动播放</button>
           </div>
           <div class="motion-board" id="motion">
@@ -97,15 +103,14 @@
           </div>
         </div>
         <noscript>
-          <ol class="checklist">
-            <li>会话收到路由指令。故障原因未知，模型加载 <code>poteto-mode</code>。</li>
-            <li>选择 Bug fix Playbook，把复现、定位、修复和复测等步骤登记到清单。</li>
-            <li>主 Agent 复现故障，结合委派调查的证据界定改动，再审查实现。</li>
-            <li>回到通知设置，关闭、保存、刷新。刷新后应仍是关闭。</li>
-            <li>原界面通过，才有这项故障的修复证据。只有单测通过时结论待定，仍能复现时回到定位。</li>
-          </ol>
+          <p class="section-intro"><code>SessionStart</code> 把路由规则加入会话，模型按请求决定怎么处理。</p>
+          <ul class="checklist">
+            <li><strong>原因未知的故障。</strong> 模型加载 <code>poteto-mode</code>，选 Bug fix Playbook 并登记步骤。主 Agent 复现故障、委派调查和实现、在同一界面复测。刷新后仍是关闭才有原路径通过的证据。只有单测通过时结论待定，仍能复现时回到定位。</li>
+            <li><strong>单文件小改。</strong> 只改设置页标题时，直接改文案并打开设置页确认标题。</li>
+            <li><strong>显式要求 TDD。</strong> 直接加载 <code>pstack:tdd</code>，先用测试重现「刷新后又开启」，验证失败原因，再修复并重跑同一测试。</li>
+          </ul>
         </noscript>
-        <p class="demo-note">教学模拟。界面、观测值和根因均为示例，复测分支依据 Bug fix Playbook。走通复测只说明该示例的验收证据成立。<sup><a href="#ref-bugfix" aria-label="来源 4">[4]</a></sup></p>
+        <p class="demo-note">教学模拟。路由依据会话指令，修复和复测依据 Bug fix Playbook 或 TDD Skill。设置页、观测值和根因均为示例。<sup><a href="#ref-hook" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-bugfix" aria-label="来源 4">[4]</a></sup><sup><a href="#ref-tdd" aria-label="来源 7">[7]</a></sup></p>
       </div>
     </section>
 
@@ -118,10 +123,10 @@
 
       <section id="beginner" class="perspective-panel" aria-labelledby="beginner-title">
         <h3 id="beginner-title">把「修一下」变成一项能验收的工作</h3>
-        <p>pstack 是一套给编码 Agent 读的 Skill，也就是做某类工作的说明。<code>poteto-mode</code> 是入口。任务简单时直接处理，像通知设置这种原因未知的故障会进入 Bug fix Playbook。Playbook 就是针对一种任务写好的步骤清单。<sup><a href="#ref-hook" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup></p>
+        <p>pstack 是一套给编码 Agent 读的 Skill，也就是做某类工作的说明。会话开始时，钩子把选择规则交给模型。只改设置页标题，可以直接改。像通知设置这种原因未知的故障，模型会加载 <code>poteto-mode</code>，使用 Bug fix Playbook，也就是事先写好的修复步骤。用户明确说「先写一个失败的回归测试再修」，则直接加载写回归测试用的 <code>tdd</code> Skill。<sup><a href="#ref-hook" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup></p>
         <ol class="checklist">
           <li><strong>先看到问题。</strong> 关掉通知，保存，刷新。刷新前显示「关」、刷新后显示「开」，这才是要修的现象。</li>
-          <li><strong>沿着证据找原因。</strong> 教学示例里，委派调查查明保存动作只改了页面里的临时状态。于是只改保存这条路径。</li>
+          <li><strong>沿着证据找原因。</strong> 示例里，点击保存后记录仍是「开」。提前写入「关」的测试记录后，刷新却能正确显示「关」。由此把修复范围缩小到保存动作。</li>
           <li><strong>用原来的方式再试一次。</strong> 再做一遍「关掉、保存、刷新」。刷新后仍然是「关」，才能确认用户遇到的现象消失。<sup><a href="#ref-bugfix" aria-label="来源 4">[4]</a></sup></li>
         </ol>
         <div class="callout">
@@ -137,7 +142,7 @@
         <dl class="design-list">
           <div>
             <dt>会话钩子提供入口</dt>
-            <dd><code>hooks/hooks.json</code> 在启动、恢复、清空或压缩会话时调用 <code>session-start.sh</code>。启用时，脚本返回 <code>session-start-context.md</code> 的路由文本。模型读到「原因未知的故障」等触发条件后加载 <code>poteto-mode</code>。用户明确要求 <code>tdd</code> 等专门 Skill 时，可以直接进入相应流程。<sup><a href="#ref-hook" aria-label="来源 2">[2]</a></sup></dd>
+            <dd><code>hooks/hooks.json</code> 在启动、恢复、清空或压缩会话时调用 <code>session-start.sh</code>。启用时，脚本返回 <code>session-start-context.md</code> 的路由文本。模型负责据此选择路径。原因未知、涉及多文件或设计取舍等任务进入 <code>poteto-mode</code>，有明显验证办法的单文件小改直接完成，用户明确要求 <code>tdd</code> 等专门 Skill 则直接加载该 Skill。<sup><a href="#ref-hook" aria-label="来源 2">[2]</a></sup></dd>
           </div>
           <div>
             <dt>Playbook 按需组合，清单记录进度</dt>
@@ -145,7 +150,7 @@
           </div>
           <div>
             <dt>主 Agent 持有验收责任</dt>
-            <dd>主 Agent 亲自复现、界定调查或实现任务，并将 <code>worker.md</code> 的路径传给子 Agent。Claude Code 可使用 <code>pstack:poteto-agent</code>；子 Agent 回传证据或改动，主 Agent 审 diff 并在原界面复测。如果改动涉及接口、所有权或数据语义，Bug fix Playbook 会先走 <code>architect</code>。某些改动还要求独立正确性审查，缺席时对应的合并就绪门槛保持关闭。<sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup><sup><a href="#ref-bugfix" aria-label="来源 4">[4]</a></sup><sup><a href="#ref-worker" aria-label="来源 5">[5]</a></sup></dd>
+            <dd>主 Agent 亲自复现、界定调查或实现任务，并将 <code>worker.md</code> 的路径传给子 Agent。Claude Code 可使用 <code>pstack:poteto-agent</code>。子 Agent 回传证据或改动，主 Agent 审 diff 并在原界面复测。如果改动涉及接口、所有权或数据语义，Bug fix Playbook 会先走 <code>architect</code>。涉及安全或数据完整性约束的代码还需要独立正确性审查。即便原界面复测通过，也要等到该审查完成后才能标记为可合并。<sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup><sup><a href="#ref-bugfix" aria-label="来源 4">[4]</a></sup><sup><a href="#ref-worker" aria-label="来源 5">[5]</a></sup></dd>
           </div>
           <div>
             <dt>验收看同一路径上的行为</dt>
@@ -154,7 +159,7 @@
         </dl>
 
         <h4>同一套 Skill 怎样跑在不同宿主？</h4>
-        <p>各移植版共享 <code>plugins/pstack/skills/</code>。Markdown 以 Claude Code 的工具词汇为主，移植版为各宿主提供映射。比如在 Codex，<code>Agent</code> 的委派动作映射为 <code>spawn_agent</code>，插件钩子需受信任才运行。在 <a href="../deepseek-harness/">DeepSeek Harness</a>，skills-only 装法只提供技能文件，用户显式请求 <code>poteto-mode</code>，委派使用宿主暴露的 <code>subagent</code> 等工具。<sup><a href="#ref-port" aria-label="来源 8">[8]</a></sup><sup><a href="#ref-codex" aria-label="来源 9">[9]</a></sup><sup><a href="#ref-dsh" aria-label="来源 10">[10]</a></sup></p>
+        <p>各移植版共享 <code>plugins/pstack/skills/</code>。Markdown 以 Claude Code 的工具词汇为主，移植版为各宿主提供映射。比如在 Codex，<code>Agent</code> 的委派动作映射为 <code>spawn_agent</code>，插件钩子需受信任才运行。在 <a href="../deepseek-harness/">DeepSeek Harness</a>，skills-only 装法提供共享技能及配套脚本等文件。用户显式请求 <code>poteto-mode</code>，委派使用宿主暴露的 <code>subagent</code> 等工具。<sup><a href="#ref-port" aria-label="来源 8">[8]</a></sup><sup><a href="#ref-codex" aria-label="来源 9">[9]</a></sup><sup><a href="#ref-dsh" aria-label="来源 10">[10]</a></sup></p>
         <p>移植仓库同步 Cursor 上游时，先应用 Cursor 到 Claude Code 的机械转换，再保留 <code>tools/forks.json</code> 明示的宿主适配或工作流差异。这样，共用的 Skill 只维护一份，宿主之间的工具差异由各自的映射处理。<sup><a href="#ref-port" aria-label="来源 8">[8]</a></sup></p>
         <div class="callout">
           <h4>设计取舍</h4>

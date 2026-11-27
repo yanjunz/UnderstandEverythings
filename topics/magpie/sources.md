@@ -11,7 +11,9 @@
 | 本地网关，默认 `127.0.0.1:3425`；支持 Chat、Responses、Messages、Gemini | [官方中文 README](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/README.zh-CN.md)；[`gateway.go` 的 DefaultAddr、Handler](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/gateway.go#L47) |
 | 修改 Agent 自身配置以接入，记录并支持恢复 | [Agent wiring](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/docs/subsystems/agent-wiring.md)，`internal/agent` 中的 Apply、stash、Disconnect |
 | 请求来源通过路径、调用凭据及请求头识别，模型名用于选择路由 | [`gateway.go` 的 agentOf](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/gateway.go#L55-L84)、[Gateway routing](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/docs/subsystems/gateway-routing.md) |
-| Codex 的自定义 provider 与 Claude Code 的 Base URL 都可以指向 Magpie | [Codex 接入源码](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/agent/codex.go#L653-L675)、[Claude Code 接入源码](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/agent/claude.go#L23-L33) |
+| Codex 有自定义 provider 与保留 ChatGPT 登录的两种接法 | [Codex 分支选择](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/agent/codex.go#L39-L63)、[自定义 provider 表](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/agent/codex_profile.go#L33-L40)、[保留登录的入口](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/codex_backend.go#L36-L42) |
+| Claude Code 读 `settings.json` 的基础地址和入口 token | [Claude Code 接入源码](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/agent/claude.go#L26-L39) |
+| 通常回环模型调用不需要共享 key，远程入口校验失败会在转发前返回 401 | [入口与共享策略](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/lan.go#L551-L556)、[校验失败分支](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/lan.go#L798-L832)、[地址对应的客户端 token](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/agent/gatewaykey.go#L10-L30) |
 | 自建 LLM Gateway 可通过支持的协议作为自定义上游 | [Providers and accounts](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/docs/subsystems/providers-accounts.md) 中的 Base URLs、模型列表与协议探测 |
 | 跨协议读取为共同内部结构，再构建目标请求 | [`ir.go`](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/ir.go)；[`gateway.go` 的 parseRequest 与 build](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/gateway.go#L9906) |
 | 回复中的文本、工具调用、推理需要正确转换 | [`chat.go`](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/chat.go)、[`anthropic.go`](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/anthropic.go)、[`responses.go`](https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/responses.go) 的 decoder、encoder，以及 `ir.go` 的 Event |
@@ -24,7 +26,7 @@
 
 ## 交互示意的边界
 
-- 请求流程中的六步是便于学习的逻辑分组，不是源码中严格的一一对应函数调用栈；省略中间件、插件、协议探测、缓存、限流、取消与服务商特殊规则。
+- 请求流程按教学需要分组。成功和上游 401 走七步，入口 401 走四步，在转发前结束。远程演示假定共享和 HTTPS 已配置，省略中间件、插件、协议探测、缓存、限流、取消与服务商特殊规则。
 - 协议对照仅展示单条用户文字及输出上限。真实 Agent 请求更复杂；Gemini 示例采用非流式入口，以免把 URL 与内容结构混在一起。IR 卡片是含义示意，不是真正的 Go 对象序列化格式。
 - `deepseek/deepseek-chat` 用于解释 `provider/model` 的结构，不构成该模型、服务商或账号当前可用的承诺。Chat 例子的路径相对于服务商配置的基础地址；实际完整 URL 取决于配置。
 - 路由实验只模拟 `order` 组的三个分支：首选成功、首选 429 后备用成功、首选 429 且无备用。计时为 UI 演示，不是延迟测量；不能据此概括所有 429、错误状态和重试策略。

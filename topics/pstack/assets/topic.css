@@ -98,16 +98,17 @@ sup { margin-inline-start: .2em; font: 650 .75rem/0 var(--mono); }
 }
 
 .architecture-map h2 { margin-bottom: .8rem; font-size: clamp(1.15rem, 2.2vw, 1.5rem); }
-.map-entry, .map-work { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
-.map-work { margin: 0; padding: 0; list-style: none; }
-.map-entry div, .map-core, .map-work li, .map-evidence {
+.map-entry { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+.map-routes { display: grid; gap: .4rem; margin: 0; padding: 0; list-style: none; }
+.map-entry div, .map-routes li, .map-evidence {
   padding: .6rem .72rem;
   border: 1px solid #587b78;
   border-radius: .5rem;
   background: #1c3a3c;
 }
 
-.map-core { border-color: #8bd5b8; background: #255648; }
+.map-routes li { display: grid; grid-template-columns: minmax(6rem, .45fr) minmax(0, 1fr); align-items: start; gap: .35rem .6rem; }
+.map-routes .map-core { border-color: #8bd5b8; background: #255648; }
 .map-evidence { border-style: dashed; background: #1b3a34; }
 .architecture-map strong { display: block; font-size: .96rem; }
 .architecture-map span, .map-connection, .map-note { color: #c8e4dd; font-size: .875rem; }
@@ -129,6 +130,8 @@ sup { margin-inline-start: .2em; font: 650 .75rem/0 var(--mono); }
 }
 
 .trace-controls label { font-weight: 700; }
+.trace-field:not([hidden]) { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem .55rem; }
+.trace-field { max-width: 100%; }
 .trace button, .trace select {
   min-height: 2.55rem;
   max-width: 100%;
@@ -204,7 +207,7 @@ sup { margin-inline-start: .2em; font: 650 .75rem/0 var(--mono); }
   .frame { width: calc(100% - 2rem); }
   .header-inner { align-items: start; }
   .header-inner nav { gap: .1rem .8rem; }
-  .map-entry div, .map-work li { padding: .5rem; }
+  .map-entry div, .map-routes li { padding: .5rem; }
   #play { margin-inline-start: 0; }
   .motion-lane { grid-template-columns: minmax(0, 1fr) 1rem minmax(0, 1fr) 1rem minmax(0, 1fr); }
   .motion-node { padding-inline: .25rem; }

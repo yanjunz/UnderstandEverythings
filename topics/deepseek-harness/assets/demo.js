@@ -37,23 +37,28 @@ const weatherTool = {
   required: ["city"],
 };
 
-function createTrace(scenario) {
+function createTrace(scenario, weatherEnabled) {
   const userMessage = { role: "user", content: scenario.question };
+  const weatherUnavailable = scenario.weather && !weatherEnabled;
   const trace = [{
     title: "组装模型上下文",
     owner: "Harness",
-    description: "运行时将系统提示、用户消息和可用工具定义送给模型。这里的工具定义说明了天气工具的用途及必填参数。",
+    description: weatherEnabled
+      ? "运行时将系统提示、用户消息和可用工具定义送给模型。这里的工具定义说明了天气工具的用途及必填参数。"
+      : "运行时仍发送原问题。天气插件已卸载，当前 Agent 没有可用的天气工具声明。",
     motion: { nodes: ["harness", "model"], link: "model" },
-    caption: "Harness → 模型 · 第一次请求带上问题和工具定义",
+    caption: weatherEnabled
+      ? "Harness → 模型 · 第一次请求带上问题和工具定义"
+      : "Harness → 模型 · 发送同一个问题，省略天气工具声明",
     label: "模型输入",
     payload: {
       system: "根据用户问题作答，需要当前天气时使用可用工具。",
       messages: [userMessage],
-      tools: [weatherTool],
+      tools: weatherEnabled ? [weatherTool] : [],
     },
   }];
 
-  if (scenario.weather) {
+  if (scenario.weather && weatherEnabled) {
     const toolCalls = scenario.weather.map(({ city }, index) => ({
       id: `weather_${index + 1}`,
       name: weatherTool.name,
@@ -77,9 +82,18 @@ function createTrace(scenario) {
       {
         title: "提出工具调用",
         owner: "DeepSeek 模型",
-        description: "模型发出工具名和参数。一条回复可以提出多笔调用，运行时为每笔保留对应的调用标识。",
+        description: "模型在助手消息中提出工具名和参数。一条回复可以提出多笔调用，运行时为每笔保留对应的调用标识。",
         motion: { nodes: ["model", "harness"], link: "model", direction: "backward" },
         caption: "模型 → Harness · 返回工具名、参数和调用编号",
+        label: "模型输出 · 工具调用提议",
+        payload: { role: "assistant", tool_calls: toolCalls },
+      },
+      {
+        title: "写入工具调用事件",
+        owner: "Harness · 工具执行器",
+        description: "Harness 把助手消息中的调用交给工具执行器。执行器在分派前将调用记录为会话事件，后续用同一个编号关联结果。",
+        motion: { nodes: ["harness", "session"], link: "session" },
+        caption: "Harness → 会话日志 · 为每笔调用追加 tool/call",
         label: "会话事件 · tool/call",
         payload: { calls: toolCalls },
       },
@@ -127,11 +141,16 @@ function createTrace(scenario) {
   trace.push({
     title: "给出最终答复",
     owner: "模型生成回复，Harness 结束回合",
-    description: scenario.description,
+    description: weatherUnavailable
+      ? "本例没有其他天气工具。模型在第一次请求后说明无法确认实时天气，这一回合没有工具调用或结果需要回填。"
+      : scenario.description,
     motion: { nodes: ["model", "harness"], link: "model", direction: "backward" },
     caption: "模型 → Harness · 返回最终答复，结束回合",
     label: "会话事件 · assistant/message → turn/end",
-    payload: { role: "assistant", content: scenario.answer },
+    payload: {
+      role: "assistant",
+      content: weatherUnavailable ? "当前没有可用的天气查询工具，我暂时无法确认实时天气。" : scenario.answer,
+    },
   });
 
   return trace;
@@ -151,10 +170,18 @@ const payload = document.getElementById("payload");
 const progress = document.getElementById("step-progress");
 const motionBoard = document.getElementById("harness-motion");
 const motionCaption = document.getElementById("motion-caption");
+const weatherPluginStatus = document.getElementById("weather-plugin-status");
+const weatherToolState = document.getElementById("weather-tool-state");
+const weatherStages = document.querySelector("#plugin-demo fieldset");
 
 let trace;
 let stepButtons;
 let currentStep;
+let weatherEnabled;
+
+function hasWeatherPlugin() {
+  return weatherStages.querySelector(":checked").value !== "dispose";
+}
 
 function formatPayload(data) {
   const lines = Object.entries(data).map(([key, value]) => {
@@ -190,9 +217,15 @@ function showStep(index) {
 
 function loadScenario() {
   pausePlayback();
+  weatherEnabled = hasWeatherPlugin();
   const scenario = scenarios[scenarioSelect.value];
-  trace = createTrace(scenario);
+  trace = createTrace(scenario, weatherEnabled);
   question.textContent = scenario.question;
+  weatherPluginStatus.textContent = weatherEnabled
+    ? "天气插件已挂载，模型可请求查天气"
+    : "天气插件已卸载，模型请求不带天气工具声明";
+  weatherToolState.textContent = weatherEnabled ? "执行查询" : "未挂载";
+  motionBoard.toggleAttribute("data-weather-unavailable", !weatherEnabled);
   stepButtons = [];
 
   const items = trace.map((step, index) => {
@@ -224,6 +257,9 @@ const pausePlayback = createFlowPlayback(document.getElementById("play-demo"), {
 });
 
 scenarioSelect.addEventListener("change", loadScenario);
+weatherStages.addEventListener("change", () => {
+  if (weatherEnabled !== hasWeatherPlugin()) loadScenario();
+});
 previous.addEventListener("click", () => {
   pausePlayback();
   showStep(currentStep - 1);

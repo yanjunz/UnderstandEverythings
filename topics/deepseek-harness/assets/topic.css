@@ -367,6 +367,14 @@ section[id] { scroll-margin-top: 1.5rem; }
 
 .simulator-top { border-bottom: 1px solid var(--line); }
 .simulator-footer { border-top: 1px solid var(--line); }
+.simulator-plugin {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem 1rem;
+  padding: .55rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+  font-size: .875rem;
+}
 .flow-play {
   padding: .45rem .75rem;
   border: 1px solid var(--accent);
@@ -388,6 +396,7 @@ section[id] { scroll-margin-top: 1.5rem; }
   --flow-ring: #3049e42b;
   border-bottom: 1px solid var(--line);
 }
+.harness-motion[data-weather-unavailable] [data-flow-node="tool"] { border-style: dashed; }
 .motion-branch { display: grid; justify-items: stretch; width: min(36%, 13rem); margin: 0 auto; }
 .motion-branch .motion-node { min-height: 3.4rem; }
 .motion-branch .session-edge { min-height: 1.55rem; }
@@ -629,7 +638,7 @@ section[id] { scroll-margin-top: 1.5rem; }
   .simulator-body { grid-template-columns: minmax(0, 1fr); }
   .step-nav { padding: .7rem; border-right: 0; border-bottom: 1px solid var(--line); }
   .step-nav ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .simulator-top, .simulator-footer, .stage { padding-inline: .85rem; }
+  .simulator-top, .simulator-footer, .simulator-plugin, .stage { padding-inline: .85rem; }
 }
 
 @media (max-width: 32rem) {

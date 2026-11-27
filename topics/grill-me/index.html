@@ -8,7 +8,6 @@
   <link rel="stylesheet" href="../../assets/flow-motion.css">
   <link rel="stylesheet" href="assets/topic.css">
   <script defer src="../../assets/perspectives.js"></script>
-  <script defer src="../../assets/flow-motion.js"></script>
   <script defer src="assets/demo.js"></script>
   <script defer src="../../assets/pageviews.js"></script>
 </head>
@@ -42,8 +41,8 @@
         <div class="map-box map-entry"><strong><code>/grill-me</code> → <code>grilling</code></strong><span>用户触发入口，宿主加载访谈 Skill</span></div>
         <p class="map-arrow">↓ 根据当前回答和事实，找出前置条件已满足的问题</p>
         <div class="map-fork">
-          <div class="map-box"><strong>Agent 调查事实</strong><span>子 Agent 查环境，返回结果</span></div>
-          <div class="map-box"><strong>用户作设计决定</strong><span>同轮问题附建议，等用户作答</span></div>
+          <div class="map-box"><strong>Agent 调查事实</strong><span>子 Agent 回传事实，相关问题等待</span></div>
+          <div class="map-box"><strong>用户作设计决定</strong><span>独立问题继续，用户回传决定</span></div>
         </div>
         <p class="map-arrow">↓ 更新设计树 · 有待答问题时进入下一轮 ↺</p>
         <div class="map-box map-exit"><strong>剩余分支已解决 → 等待用户确认</strong><span>仍在调查的必要事实继续等待</span></div>
@@ -54,17 +53,23 @@
     <section id="interview-demo" class="demo-section" aria-labelledby="demo-title">
       <div class="frame">
         <h2 id="demo-title">读书会报名要不要开放候补？</h2>
-        <p class="section-intro">扮演活动组织者，回答这一轮的设计问题。再让模拟仓库返回事实，看看哪些问题会被解锁，哪些分支会被跳过。</p>
+        <p class="section-intro">扮演活动组织者。选择开放候补后，模拟仓库会调查名额释放时能否触发候补补位。活动提醒由组织者手动发送，调查期间仍可决定提前多久发。</p>
         <div id="interview" class="interview" hidden>
           <div class="motion-board" id="interview-motion">
             <div class="motion-lane">
-              <div class="motion-node" data-flow-node="repo"><strong>仓库调查</strong><span>后台执行能力</span></div>
+              <div class="motion-node" data-flow-node="repo"><strong>仓库调查</strong><span id="motion-fact-status">等待派查</span></div>
               <div class="motion-edge" data-flow-link="fact" aria-hidden="true"><span class="motion-packet"></span></div>
               <div class="motion-node" data-flow-node="agent"><strong>Agent</strong><span>整理前沿与建议</span></div>
-              <div class="motion-edge" data-flow-link="question" aria-hidden="true"><span class="motion-packet"></span></div>
+              <div class="motion-channel" aria-hidden="true">
+                <div class="motion-edge" data-flow-link="question"><span class="motion-packet"></span></div>
+                <div class="motion-edge" data-flow-link="reply"><span class="motion-packet"></span></div>
+              </div>
               <div class="motion-node" data-flow-node="user"><strong>组织者</strong><span>作答与确认</span></div>
             </div>
-            <p class="motion-caption" id="motion-caption" role="status"></p>
+            <div class="motion-details">
+              <p class="motion-caption" id="motion-caption" role="status"></p>
+              <button id="replay-motion" class="secondary-button" type="button">重播本次流向</button>
+            </div>
           </div>
           <div class="interview-body">
             <div class="interview-main">
@@ -74,7 +79,11 @@
                 <div id="questions"></div>
                 <button class="action-button" type="submit">提交本轮回答</button>
               </form>
-              <button id="confirm" class="action-button" type="button" hidden>确认已达成共识</button>
+              <div id="consensus" class="consensus" hidden>
+                <h4>请核对报名方案</h4>
+                <p id="consensus-plan"></p>
+                <button id="confirm" class="action-button" type="button">确认已达成共识</button>
+              </div>
               <button id="restart" class="secondary-button" type="button">重新开始</button>
             </div>
             <aside class="interview-aside" aria-labelledby="dependency-title">
@@ -90,8 +99,8 @@
                 <h4>模拟仓库调查</h4>
                 <p id="fact-status"></p>
                 <div id="fact-controls">
-                  <button class="secondary-button" type="button" value="available">返回：已有后台任务能力</button>
-                  <button class="secondary-button" type="button" value="missing">返回：缺少后台任务能力</button>
+                  <button class="secondary-button" type="button" value="available">返回已有名额释放事件</button>
+                  <button class="secondary-button" type="button" value="missing">返回缺少名额释放事件</button>
                 </div>
               </div>
             </aside>
@@ -106,10 +115,10 @@
         </template>
         <noscript>
           <ol class="steps">
-            <li>第一轮可同时问是否开放候补、是否提醒已确认的参与者。</li>
-            <li>同意发送提醒后可决定提前多久。仓库调查还在进行时，自动补位暂缓，提醒仍可继续讨论。</li>
-            <li>开放候补且调查完成后可决定自动还是手动补位。若选择自动补位，再问给候补者保留名额多久。</li>
-            <li>满额即关闭会跳过补位整条分支。相关决策都解决后，由用户确认共识。</li>
+            <li>第一轮可同时问是否开放候补，以及是否由组织者手动提醒已确认的参与者。</li>
+            <li>开放候补后，Agent 调查取消报名时系统是否发出名额释放事件。调查期间仍可决定何时手动发送提醒。</li>
+            <li>调查完成后可决定自动还是手动补位。若选择自动补位，再问给候补者保留名额多久。</li>
+            <li>满额即关闭会跳过补位整条分支。相关决策都解决后，由用户核对和确认方案。</li>
           </ol>
         </noscript>
         <p class="demo-note">教学模拟。人工作答推动轮次，侧栏按钮仅模拟工具返回；现场问题由模型判断，演示用固定依赖来展示机制。范围限于候补和提醒。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></p>
@@ -127,8 +136,8 @@
         <h3 id="beginner-title">先问会改变后续的问题</h3>
         <p><code>/grill-me</code> 是做设计访谈的 Skill。你只要说出想做什么，Agent 就会把可能影响方案的选择列出来。它给建议，由你决定。如果你说「满额即关闭」，后面就跳过怎么补位和给候补者保留多久。<sup><a href="#ref-guide" aria-label="来源 4">[4]</a></sup></p>
         <ol class="steps">
-          <li><strong>先问能独立回答的。</strong>「要候补吗？」和「要提醒已经报名成功的人吗？」互不影响，可以一轮问完。当前所有能问的问题合称<strong>前沿</strong>。</li>
-          <li><strong>先查现有能力。</strong>你同意候补。Agent 去查仓库有没有后台任务能力，回来后才有依据建议自动或手动补位。提醒提前多久可以先定。</li>
+          <li><strong>先问能独立回答的。</strong>「要候补吗？」和「活动前要手动发提醒吗？」互不影响，可以一轮问完。当前所有能问的问题合称<strong>前沿</strong>。</li>
+          <li><strong>先查现有能力。</strong>你同意候补，Agent 去查有人取消报名时，系统能不能发出名额释放事件。拿到结果才有依据建议自动还是手动补位。因为活动提醒由组织者手动发送，提前多久发可以先定。</li>
           <li><strong>按答案打开下一层。</strong>你选自动补位，才出现「给下一位候补者保留多久？」选手动则略过示例里的自动保留时限。</li>
           <li><strong>最后核对共识。</strong>没有待答问题、相关调查也到齐时，核对双方理解是否一致。Agent 等你确认后才可据此行动。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></li>
         </ol>
@@ -148,11 +157,11 @@
           </div>
           <div>
             <dt>查询事实和作决定是两条路径</dt>
-            <dd>上游要求在新的上下文中派子 Agent 调查环境。例如查能否运行后台任务。没有调查结果时，只有补位方式和下游受阻；提醒时间还在前沿。查到后台执行能力缺失，结论是「自动化需要额外开发」，是否扩大本期范围仍由用户决定。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></dd>
+            <dd>上游要求派子 Agent 在新的上下文中查证事实。示例只查取消报名释放名额时，系统是否已发出可触发候补补位的事件。结果未返回时，补位方式和下游等待，手动提醒的时间仍可决定。缺少名额释放事件意味着自动补位需要加开发工作，是否扩大本期范围仍由用户决定。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></dd>
           </div>
           <div>
             <dt>建议的措辞让决定可确认、可反驳</dt>
-            <dd>每个问题有编号、题目和建议。源码规定把问句写成回答「是」就接受建议的形式，例如缺少后台任务时问「本期由组织者手动补位吗？」。用户仍可以选择新增自动化。回答更新假设；发现一项决定依赖了错误前提时，应重新打开受影响的分支。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-loop-doc" aria-label="来源 3">[3]</a></sup></dd>
+            <dd>每个问题有编号、题目和建议。源码规定把问句写成回答「是」就接受建议的形式，例如缺少名额释放事件时问「本期由组织者手动补位吗？」。用户仍可以选择新增自动化。回答会更新假设。发现一项决定依赖了错误前提时，应重新打开受影响的分支。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-loop-doc" aria-label="来源 3">[3]</a></sup></dd>
           </div>
           <div>
             <dt>暂时问不了与已结束需要区分</dt>
