@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="从“这个项目怎么跑测试”理解 Pi 编程助手的工具调用循环、模型适配与会话管理。">
+  <title>Pi Agent 架构与设计原理 · 理解万物</title>
+  <link rel="stylesheet" href="assets/topic.css">
+  <link rel="stylesheet" href="../../assets/architecture.css">
+  <script defer src="../../assets/perspectives.js"></script>
+  <script defer src="assets/demo.js"></script>
+  <script defer src="../../assets/pageviews.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="site-header"><div class="frame header-inner">
+    <a class="brand" href="../../"><span aria-hidden="true">理</span>理解万物</a>
+    <nav aria-label="页内导航"><a href="#walkthrough">逐步演示</a><a href="#architect">架构师视角</a><a href="#references">参考资料</a></nav>
+  </div></header>
+  <main id="main">
+    <section class="frame hero" aria-labelledby="page-title">
+      <div>
+        <h1 id="page-title">Pi Agent<span>架构与设计原理</span></h1>
+        <p class="lead">你问「这个项目怎么跑测试？」模型得先看到项目里的线索。Pi 让它请求读取文件，把读到的内容送回去，再由它给出有依据的回答。</p>
+        <div class="hero-actions"><a class="primary" href="#walkthrough">逐步查看工具调用</a><a href="#architect">查看组件分工</a></div>
+      </div>
+      <figure class="exchange">
+        <figcaption>一次提问，两轮模型响应</figcaption>
+        <dl>
+          <div><dt>第 1 轮 · 模型请求读文件</dt><dd><code>read("package.json")</code></dd></div>
+          <div><dt>本地工具返回文件片段</dt><dd><code>"scripts": { "test": "vitest run" }</code></dd></div>
+          <div><dt>第 2 轮 · 模型回答用户</dt><dd>运行 <code>npm test</code>，它会调用 Vitest。</dd></div>
+        </dl>
+        <p>示例使用 npm，工具调用写法已简化。</p>
+      </figure>
+    </section>
+    <section id="walkthrough" class="walkthrough" aria-labelledby="walkthrough-heading">
+      <div class="frame">
+        <h2 id="walkthrough-heading">Pi 怎样查到测试命令？</h2>
+        <p class="section-intro">同一句提问，换一种文件状态，看看模型第二次收到的消息有什么变化。</p>
+        <div class="trace" id="pi-trace" hidden>
+          <div class="trace-controls">
+            <label for="pi-file-state">项目目录里的 package.json</label>
+            <select id="pi-file-state">
+              <option value="present">存在，包含测试脚本</option>
+              <option value="missing">文件缺失</option>
+            </select>
+          </div>
+          <div class="trace-stage" aria-live="polite" aria-atomic="true">
+            <p class="trace-progress" id="pi-progress"></p>
+            <h3 id="pi-step-title"></h3>
+            <div class="trace-route"><span class="trace-node" id="pi-sender"></span><span class="trace-arrow" aria-label="传给"> → </span><span class="trace-node" id="pi-receiver"></span></div>
+            <pre class="trace-payload"><code id="pi-payload"></code></pre>
+            <p class="trace-detail" id="pi-detail"></p>
+          </div>
+          <div class="trace-actions">
+            <button type="button" id="pi-prev">上一步</button>
+            <button type="button" id="pi-next">下一步</button>
+          </div>
+        </div>
+        <noscript><p>Pi 把提问和可用工具交给模型。模型请求读取 package.json，Pi 执行 read，把文件内容或读取错误加入下一轮请求。看到测试脚本，模型就有依据给出命令。读不到文件时，它可以请你确认目录。</p></noscript>
+        <p class="demo-note">教学模拟。页面使用示例数据。假设项目使用 npm，模型只请求一次读取。消息仅展示相关字段，失败后的答复是其中一种可能。<a href="#ref-loop">查看循环源码</a></p>
+      </div>
+    </section>
+    <section id="perspectives" class="frame reading" aria-labelledby="perspectives-title">
+      <h2 id="perspectives-title">从两个视角看这次读取</h2>
+      <div class="perspective-choices" data-perspective-tabs aria-labelledby="perspectives-title">
+        <a id="beginner-tab" href="#beginner"><strong>初学者</strong><span>跟着问题找证据</span></a>
+        <a id="architect-tab" href="#architect"><strong>架构师</strong><span>沿数据流看组件边界</span></a>
+      </div>
+      <section id="beginner" class="perspective-panel" aria-labelledby="beginner-title">
+        <h3 id="beginner-title">Pi 怎样知道该用哪条测试命令？</h3>
+        <p>Pi 是一个能在终端里操作代码库的编程助手。你可以只问怎么运行测试。假设这是一个用 npm 的项目，测试命令就可能写在项目的 <code>package.json</code> 文件里。</p>
+        <ol class="steps">
+          <li><strong>模型选择要看的文件。</strong>Pi 把问题和可用工具的说明交给模型。模型知道有一个叫 <code>read</code> 的读文件工具，于是回复一个工具名和文件路径。</li>
+          <li><strong>Pi 在本地读取文件。</strong>假设工具读到 <code>"test": "vitest run"</code>。Pi 把这段项目配置作为工具结果，连同原问题交给模型。这就是第二轮比第一轮多出的证据。</li>
+          <li><strong>模型根据结果回答。</strong>现在它可以解释，运行 <code>npm test</code> 会调用 <code>vitest run</code>。这次只读了配置。要知道测试是否通过，还得实际执行命令并查看退出状态。</li>
+        </ol>
+        <p>如果文件缺失，工具返回读取错误。模型可以再查 README 或向你确认项目目录。在演示里，它选择说明目前缺少哪条证据。<a href="#ref-agent">工具调用示例</a> · <a href="#ref-read">读取工具实现</a></p>
+        <aside class="callout"><h4>换成 Jest 要改哪里？</h4><p>如果项目把测试脚本改成 <code>jest</code>，同一个读取工具就会带回新的命令。Pi 可以原样使用这个循环。作者选择读写文件和执行命令等通用工具，一个理由是模型已经熟悉这些操作。<a href="#ref-author">作者的设计说明</a></p></aside>
+      </section>
+      <section id="architect" class="perspective-panel" aria-labelledby="architect-title" tabindex="-1">
+        <h3 id="architect-title">一次提问，为什么会调用两次模型？</h3>
+        <p>以“这个项目怎么跑测试？”为例。假设当前目录是一个 npm 项目，启用了 <code>read</code>，模型选择先查看 <code>package.json</code>。图中只追踪读取测试脚本的一条路径。</p>
+        <figure class="arch-overview" aria-labelledby="pi-arch-flow">
+          <figcaption id="pi-arch-flow">从用户问题到有文件依据的回答</figcaption>
+          <ol class="arch-flow" role="list">
+            <li><strong>会话接收问题</strong><span><code>pi-coding-agent</code> 把用户消息交给 Agent。运行时准备已有消息和可用工具说明。</span></li>
+            <li><strong>模型选择动作</strong><span><code>pi-ai</code> 适配模型服务。模型第一次响应，请求 <code>read</code> 读取 <code>package.json</code>。</span></li>
+            <li><strong>工具读取文件</strong><span><code>pi-agent-core</code> 校验参数并分派。编码应用提供的 <code>read</code> 在工作目录中取回文件内容。</span></li>
+            <li><strong>结果回到模型</strong><span>运行时把工具结果加入消息，发起第二次模型调用。模型据此解释 <code>npm test</code> 会运行什么。</span></li>
+          </ol>
+        </figure>
+        <p>这条路径有两份不同用途的状态。运行时在内存中维护当前消息，供下一轮推理使用。启用持久化时，编码应用的 <code>AgentSession</code> 将相关记录交给 <code>SessionManager</code> 保存，关闭终端后仍可恢复会话。<a href="#ref-loop">执行循环</a> · <a href="#ref-session">会话实现</a></p>
+        <table class="arch-table">
+          <caption>同一次请求在哪个环节改变结果</caption>
+          <thead><tr><th scope="col">条件</th><th scope="col">循环收到什么</th><th scope="col">接下来会怎样</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">读到脚本</th><td><code>toolResult</code> 带回文件正文。假设 <code>scripts.test</code> 是 <code>vitest run</code>。</td><td>模型可说明运行 <code>npm test</code> 会调用 Vitest。要知道测试能否通过，还需要实际执行。</td></tr>
+            <tr><th scope="row">文件不存在</th><td><code>read</code> 执行失败，运行时生成带 <code>isError</code> 的工具结果。</td><td>下一轮模型能根据错误再查目录、询问项目位置，或说明缺少依据。</td></tr>
+            <tr><th scope="row">模型服务报错</th><td>若第一次模型请求返回 <code>stopReason = error</code>，本轮产生的是助手错误消息。</td><td>运行时结束本次循环，尚未分派读取。排查应从模型请求入手，是否重试由上层处理。</td></tr>
+          </tbody>
+        </table>
+        <details class="arch-detail" id="architect-messages">
+          <summary>追踪请求、工具结果和终端事件</summary>
+          <div class="arch-detail-body">
+            <p>模型接收工具的名称、说明和参数结构。它返回的 <code>toolCall</code> 带调用 ID、名称和参数。运行时按名称找到实际工具，把调用 ID 写入 <code>toolResult.toolCallId</code>。这样即使一次请求读了两个文件，也能把每个结果配回相应的调用。<a href="#ref-agent">工具调用事件</a> · <a href="#ref-read">读取工具</a></p>
+            <p><code>tool_execution_end</code> 告知终端一次执行已结束，适合刷新界面。进入下一次模型请求的是结果消息。应用内部的消息还可以包含界面信息，<code>convertToLlm</code> 在请求边界将它们转换为模型可接收的消息。<a href="#ref-agent">消息转换</a> · <a href="#ref-ai">模型接口</a></p>
+          </div>
+        </details>
+        <details class="arch-detail" id="architect-tradeoffs">
+          <summary>小核心的收益与代价，怎样决定改哪一层？</summary>
+          <div class="arch-detail-body">
+            <p>Mario Zechner 希望能控制每一轮送给模型的上下文。编码应用默认启用 <code>read</code>、<code>bash</code>、<code>edit</code>、<code>write</code>，项目可以用扩展注册自己的工具或响应会话事件。运行时只需按共同的工具接口接收请求、执行、回传结果。<a href="#ref-tools">默认工具</a> · <a href="#ref-extensions">扩展接口</a> · <a href="#ref-author">作者的设计说明</a></p>
+            <p><strong>设计取舍（本页分析）</strong>　假设代码库搬到远程工作区，现有 <code>read</code> 可以替换底层文件操作，继续接受相同的路径参数。模型接口和执行循环便能复用。相应地，远程路径怎么解析、连接中断怎样报告，都由工具实现承担。即便工具成功，最终答案仍依赖模型正确解读返回内容。<a href="#ref-read">读取工具的操作接口</a></p>
+          </div>
+        </details>
+      </section>
+    </section>
+    <section id="references" class="sources"><div class="frame">
+      <h2>源码与设计记录</h2>
+      <p>本文按 <code>earendil-works/pi</code> 的 <code>v1.6.1</code> 讲解。示例中的项目文件与两轮对话均为教学模拟。</p>
+      <ul class="references">
+        <li id="ref-agent"><a href="https://github.com/earendil-works/pi/blob/v1.6.1/packages/agent/README.md#with-tool-calls">Agent 运行时文档</a> · 消息与工具事件</li>
+        <li id="ref-loop"><a href="https://github.com/earendil-works/pi/blob/v1.6.1/packages/agent/src/agent-loop.ts">agent-loop.ts</a> · 执行工具、回填结果与结束条件</li>
+        <li id="ref-session"><a href="https://github.com/earendil-works/pi/blob/v1.6.1/packages/coding-agent/src/core/agent-session.ts">agent-session.ts</a> · 会话协调与持久化</li>
+        <li id="ref-tools"><a href="https://github.com/earendil-works/pi/blob/v1.6.1/packages/coding-agent/docs/cli.md#tool-options">CLI 工具选项</a> · 默认工具与选择方式</li>
+        <li id="ref-read"><a href="https://github.com/earendil-works/pi/blob/v1.6.1/packages/coding-agent/src/core/tools/read.ts">read.ts</a> · 路径参数与实际读取</li>
+        <li id="ref-ai"><a href="https://github.com/earendil-works/pi/tree/v1.6.1/packages/ai">pi-ai</a> · 模型服务适配</li>
+        <li id="ref-extensions"><a href="https://github.com/earendil-works/pi/blob/v1.6.1/packages/coding-agent/docs/extensions.md">扩展文档</a> · 注册工具与订阅事件</li>
+        <li id="ref-author"><a href="https://mariozechner.at/posts/2025-11-30-pi-coding-agent/">Mario Zechner 的设计记录</a> · 控制上下文与选择工具的理由</li>
+      </ul>
+    </div></section>
+  </main>
+  <footer><div class="frame"><a href="../../">返回主题目录</a><span data-pageviews="page">本页浏览量（PV） <span data-pv-value aria-live="polite">—</span></span></div></footer>
+</body>
+</html>

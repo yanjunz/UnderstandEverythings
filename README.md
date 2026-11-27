@@ -4,6 +4,7 @@
 
 当前主题
 
+- [Pi Agent 架构与设计原理](topics/pi-agent/index.html)用一次测试命令查询追踪模型、工具和会话之间的数据流。
 - [DeepSeek Harness 原理](topics/deepseek-harness/index.html)从一次天气查询入手，展示上下文组装、工具调用和回合结束。
 - [Magpie 的运行原理](topics/magpie/index.html)跟踪一次模型请求，展示网关接入、协议转换、路由和故障切换。
 - [pstack Skill 原理](topics/pstack/index.html)跟着一次故障修复，理解会话路由、Playbook、子 Agent 分工和验证证据。
