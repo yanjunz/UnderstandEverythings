@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="从数素数开始，用交互图理解黎曼 ζ 函数、临界线和素数分布的估计误差。">
+  <title>理解黎曼猜想 · 理解万物</title>
+  <link rel="stylesheet" href="../../assets/architecture.css">
+  <link rel="stylesheet" href="assets/topic.css">
+  <script defer src="../../assets/perspectives.js"></script>
+  <script defer src="../../assets/pageviews.js"></script>
+  <script defer src="assets/demo.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="site-header">
+    <div class="frame header-inner">
+      <a class="brand" href="../../"><span class="brand-mark" aria-hidden="true">理</span> 理解万物</a>
+      <nav aria-label="页内导航">
+        <a href="#primes">数素数</a>
+        <a href="#zeta">ζ 函数</a>
+        <a href="#zeros">看零点</a>
+        <a href="#error">估计误差</a>
+        <a href="#architect">架构师视角</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="page-title">
+      <div class="frame hero-inner">
+        <div class="hero-copy">
+          <p class="subject">数论 <span></span> Riemann hypothesis</p>
+          <h1 id="page-title">黎曼猜想</h1>
+          <p class="hero-question">素数有多难预测？</p>
+          <p class="hero-lead">黎曼猜想断言，ζ 函数的每个非平凡零点都位于实部为 <strong>1/2</strong> 的直线上。若它成立，我们就能更精确地限制估算素数个数时的误差。</p>
+          <a class="primary" href="#primes">从数素数开始 <span aria-hidden="true">↓</span></a>
+          <a class="deep-link" href="#architect">看公式怎样连接两者 →</a>
+        </div>
+        <figure class="zero-card" aria-labelledby="zero-caption">
+          <div class="figure-heading"><span>ζ 函数的非平凡零点</span><span class="figure-jargon">虚部 &gt; 0</span></div>
+          <div class="complex-plot" role="img" aria-label="复平面的横轴为实部，从 0 到 1。纵轴为虚部，从 0 到 36。虚部最小的四个正虚部零点位于实部等于二分之一的临界线上。">
+            <div class="plot-grid" aria-hidden="true">
+              <span class="y-tick" style="--height: 0%">0</span>
+              <span class="y-tick" style="--height: 27.7778%">10</span>
+              <span class="y-tick" style="--height: 55.5556%">20</span>
+              <span class="y-tick" style="--height: 83.3333%">30</span>
+              <span class="critical-line"></span>
+              <span class="zero-dot selected" data-zero="0" style="--height: 39.2631%"></span>
+              <span class="zero-dot" data-zero="1" style="--height: 58.3946%"></span>
+              <span class="zero-dot" data-zero="2" style="--height: 69.4746%"></span>
+              <span class="zero-dot" data-zero="3" style="--height: 84.5135%"></span>
+              <span class="axis-label axis-imaginary">虚部</span>
+              <span class="axis-label axis-real">实部</span>
+              <span class="x-tick start">0</span><span class="x-tick middle">1/2</span><span class="x-tick end">1</span>
+            </div>
+          </div>
+          <figcaption id="zero-caption"><span class="legend-dot"></span> 虚部最小的四个正虚部零点 <span class="legend-line"></span> 临界线</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <div class="frame content" id="perspectives">
+      <nav class="perspective-choices" data-perspective-tabs aria-label="讲解视角">
+        <a id="beginner-tab" href="#beginner">初学者</a>
+        <a id="architect-tab" href="#architect">架构师</a>
+      </nav>
+      <div id="beginner">
+        <section id="primes" class="chapter" aria-labelledby="prime-title">
+          <h2 id="prime-title">100 以内有多少个素数？</h2>
+          <p>素数是大于 1、只能被 1 和自身整除的整数。2、3、5、7 是素数，9 可以分解成 3 × 3。把不超过 <var>x</var> 的素数数一遍，得到的个数写作 <span class="math">π(<var>x</var>)</span>。这里的 π 是函数名，读作「素数计数函数」。</p>
+          <p>例如，10 以内有 4 个素数，100 以内有 25 个。随着范围增大，素数总体变得稀疏。<strong>素数定理</strong>说明 <span class="math">π(<var>x</var>)</span> 和 <span class="math"><var>x</var> / ln <var>x</var></span> 的比值会趋近于 1。<span class="math">ln</span> 表示自然对数。这个定理已经证明。<sup><a href="#ref-primes" aria-label="参考资料 1">[1]</a></sup></p>
+
+          <div class="lab prime-lab" id="prime-demo" hidden>
+            <div class="lab-top">
+              <div>
+                <h3>把实际个数和估计画在一起</h3>
+                <p>选择上限 <var>x</var>，图中横轴随之展开。</p>
+              </div>
+              <div class="presets" role="group" aria-label="常用上限">
+                <button type="button" data-limit="10" aria-pressed="false">10</button>
+                <button type="button" data-limit="100" aria-pressed="true">100</button>
+                <button type="button" data-limit="1000" aria-pressed="false">1,000</button>
+              </div>
+            </div>
+            <div class="range-control">
+              <label for="prime-limit">上限 <var>x</var></label>
+              <input id="prime-limit" type="range" min="10" max="1000" value="100">
+              <output id="limit-value" for="prime-limit">100</output>
+            </div>
+            <dl class="stats" aria-label="上限处的实际个数和估计值">
+              <div><dt><span class="swatch actual"></span> 实际值 π(<var>x</var>)</dt><dd id="actual-value">25</dd></div>
+              <div><dt><span class="swatch basic"></span> 估计 <var>x</var> / ln <var>x</var></dt><dd id="basic-value">21.71</dd></div>
+              <div><dt><span class="swatch integral"></span> 估计 Li₂(<var>x</var>)</dt><dd id="integral-value">29.08</dd></div>
+            </dl>
+            <canvas id="prime-chart" role="img" aria-label="素数实际个数和两条估计曲线。具体数值列在图上方。"></canvas>
+            <p class="lab-reading" id="prime-reading" role="status"></p>
+          </div>
+
+          <p>实际个数是一条阶梯线。每遇到一个素数，<span class="math">π(<var>x</var>)</span> 就加 1。另一种平滑估计 <span class="math">Li₂(<var>x</var>)</span> 把从 2 到 <var>x</var> 的局部密度 <span class="math">1 / ln <var>t</var></span> 累加起来，写成积分 <span class="math">∫₂ˣ <span class="nowrap">d<var>t</var> / ln <var>t</var></span></span>。图中用数值积分估算它。在 <var>x</var> = 100 时，<span class="math">Li₂(100) ≈ 29.08</span>，比实际多估约 4.08 个。黎曼猜想关系到这种差距随 <var>x</var> 增大可以有多大。</p>
+        </section>
+
+        <section id="zeta" class="chapter" aria-labelledby="zeta-title">
+          <h2 id="zeta-title">ζ 函数怎么包含素数？</h2>
+          <p>先把输入 <var>s</var> 当成大于 1 的实数。黎曼 ζ 函数把每个正整数的 <var>s</var> 次幂的倒数加起来。输入 2，相当于把 <span class="math">1、1/4、1/9、1/16</span> 一直加下去，结果约为 1.644934。<sup><a href="#ref-zeta" aria-label="参考资料 2">[2]</a></sup></p>
+          <div class="formula-board">
+            <p class="formula" aria-label="ζ(s) 等于 1 加 1 除以 2 的 s 次幂，加 1 除以 3 的 s 次幂，依此类推。">ζ(<var>s</var>) = 1 + 1/2<sup><var>s</var></sup> + 1/3<sup><var>s</var></sup> + ⋯</p>
+            <p class="formula" aria-label="同一个 ζ(s) 等于对所有素数 p 的乘积，每个因子是 1 除以括号 1 减 p 的负 s 次幂。">ζ(<var>s</var>) = <span class="product">∏<sub><var>p</var> 为素数</sub></span> (1 − <var>p</var><sup>−<var>s</var></sup>)<sup>−1</sup></p>
+            <p class="formula-caption">同一个函数的两种写法。当 <var>s</var> 是复数时，这两式在实部 &gt; 1 的范围内成立。</p>
+          </div>
+          <p>第二种写法叫<strong>欧拉乘积</strong>。以 <var>s</var> = 2 为例，素数 2 对应因子 <span class="math">1 + 1/2² + 1/4² + ⋯</span>，素数 3 对应 <span class="math">1 + 1/3² + 1/9² + ⋯</span>。展开乘积时，可以从这两项分别取 <span class="math">1/4²</span> 和 <span class="math">1/3²</span>，得到 <span class="math">1/12²</span>。因为 <span class="math">12 = 2² × 3</span>，没有另一种选法也得到这一项。</p>
+          <p>每个大于 1 的整数都有唯一的素因数分解。把所有素数对应的因子乘起来，展开后就给 ζ 的求和式贡献了每个整数恰好一次。这解释了研究一个由正整数写成的函数，为什么能得到关于素数的信息。</p>
+        </section>
+
+        <section id="zeros" class="chapter" aria-labelledby="zeros-title">
+          <h2 id="zeros-title">猜想说的是哪些零点？</h2>
+          <p><strong>复数</strong>可以写成 <span class="math"><var>s</var> = σ + <var>it</var></span>，其中 <span class="math"><var>i</var>² = −1</span>。把它画在平面上，实部 σ 是横坐标，虚部 <var>t</var> 是纵坐标。不同的输入可以落在同一条竖线上，因为它们的实部相同。</p>
+          <p>前面的求和式在实部 ≤ 1 时会发散。不过可以用<strong>解析延拓</strong>把 ζ 定义到整个复平面，只有 <var>s</var> = 1 是极点。解析延拓要求新公式在原来有效的范围内给出相同的值，并在每个非极点附近都能写成收敛的幂级数。这些条件确定了唯一的延拓。<sup><a href="#ref-zeta" aria-label="参考资料 2">[2]</a></sup></p>
+          <details class="deep-dive">
+            <summary>看一个解析延拓的例子</summary>
+            <p>对大于 1 的实数 <var>s</var>，把偶数项的符号全部反过来，会让原来的总和乘上 <span class="math">1 − 2<sup>1−<var>s</var></sup></span>。于是 ζ 也可以写成交错级数 <span class="math">1 − 1/2<sup><var>s</var></sup> + 1/3<sup><var>s</var></sup> − ⋯</span> 除以这个因子。交错级数在 <var>s</var> = 1/2 时仍然收敛，除以 <span class="math">1 − √2</span> 就得到 <span class="math">ζ(1/2) ≈ −1.46035</span>。这个例子展示了换一种公式怎样在原级数发散的地方给出 ζ 的值。<sup><a href="#ref-zeta" aria-label="参考资料 2">[2]</a></sup></p>
+          </details>
+          <p>如果某个输入让 <span class="math">ζ(<var>s</var>) = 0</span>，这个输入就叫零点。负偶数 −2、−4、−6、… 是已知的<strong>平凡零点</strong>。其余零点位于 <span class="math">0 &lt; Re(<var>s</var>) &lt; 1</span> 的<strong>临界带</strong>。猜想进一步断言，它们全都在带正中的<strong>临界线</strong> <span class="math">Re(<var>s</var>) = 1/2</span> 上。<sup><a href="#ref-zeros" aria-label="参考资料 3">[3]</a></sup></p>
+
+          <div class="lab zero-lab" id="zero-demo" hidden>
+            <h3>比较四个零点的坐标</h3>
+            <p>选一个零点。下面的图与页首使用相同刻度，只画虚部为正的一侧。</p>
+            <div class="zero-layout">
+              <fieldset class="zero-picker">
+                <legend>按虚部从小到大排列</legend>
+                <label><input type="radio" name="zero" value="0" checked><span>第 1 个</span><span class="decimal">14.1347</span></label>
+                <label><input type="radio" name="zero" value="1"><span>第 2 个</span><span class="decimal">21.0220</span></label>
+                <label><input type="radio" name="zero" value="2"><span>第 3 个</span><span class="decimal">25.0109</span></label>
+                <label><input type="radio" name="zero" value="3"><span>第 4 个</span><span class="decimal">30.4249</span></label>
+                <p id="zero-reading" role="status">ρ ≈ 0.5 + 14.1347i</p>
+              </fieldset>
+              <div class="complex-plot zero-detail" role="img" aria-label="四个已知零点位于实部为二分之一的竖线上。所选零点的坐标显示在选项下方。">
+                <div class="plot-grid" aria-hidden="true">
+                  <span class="y-tick" style="--height: 0%">0</span>
+                  <span class="y-tick" style="--height: 27.7778%">10</span>
+                  <span class="y-tick" style="--height: 55.5556%">20</span>
+                  <span class="y-tick" style="--height: 83.3333%">30</span>
+                  <span class="critical-line"></span>
+                  <span class="zero-guide" id="zero-guide" style="--height: 39.2631%"></span>
+                  <span class="zero-dot selected" data-zero="0" style="--height: 39.2631%"></span>
+                  <span class="zero-dot" data-zero="1" style="--height: 58.3946%"></span>
+                  <span class="zero-dot" data-zero="2" style="--height: 69.4746%"></span>
+                  <span class="zero-dot" data-zero="3" style="--height: 84.5135%"></span>
+                  <span class="axis-label axis-imaginary">虚部</span>
+                  <span class="axis-label axis-real">实部</span>
+                  <span class="x-tick start">0</span><span class="x-tick middle">1/2</span><span class="x-tick end">1</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p>例如，第一个正虚部零点约为 <span class="math">0.5 + 14.1347<var>i</var></span>。它还有一个关于实轴对称的共轭零点 <span class="math">0.5 − 14.1347<var>i</var></span>。Platt 和 Trudgian 严格核验了正虚部不超过 <span class="math">3 × 10<sup>12</sup></span> 的所有零点都在临界线上。有限高度只覆盖有限多个零点。黎曼猜想断言这对全部非平凡零点成立，至今仍未获证明。<sup><a href="#ref-verification" aria-label="参考资料 4">[4]</a></sup><sup><a href="#ref-clay" aria-label="参考资料 5">[5]</a></sup></p>
+        </section>
+
+        <section id="error" class="chapter" aria-labelledby="error-title">
+          <h2 id="error-title">零点的位置怎样限制误差？</h2>
+          <p>欧拉乘积提供了入口。对它取对数并求导，会得到一串带权的素数和素数幂。再用复分析把这串求和转换成一个计数公式，ζ 的零点就出现在修正项里。这个关系称为<strong>显式公式</strong>。<sup><a href="#ref-explicit" aria-label="参考资料 6">[6]</a></sup></p>
+          <div class="formula-board error-board">
+            <p class="formula" aria-label="每个零点 ρ 对应的项为负的 x 的 ρ 次幂除以 ρ。">每个零点 ρ 对应一项 <span class="nowrap">−<var>x</var><sup>ρ</sup> / ρ</span></p>
+            <p>若 <span class="math">ρ = σ + <var>it</var></span>，这项的大小是 <span class="math"><var>x</var><sup>σ</sup> / |ρ|</span>。虚部 <var>t</var> 使它随 ln <var>x</var> 改变相位。共轭的两项相加会形成实数振荡。</p>
+          </div>
+          <p>实部越靠右，<span class="math"><var>x</var><sup>σ</sup></span> 随 <var>x</var> 长得越快。若实部正好是 1/2，增长因子就是 <span class="math">√<var>x</var></span>。例如 <var>x</var> = 10<sup>12</sup> 时，<span class="math"><var>x</var><sup>1/2</sup> = 10<sup>6</sup></span>。如果只把指数换成假设的 0.6，增长因子就约是 1.58 × 10<sup>7</sup>。这两个数字只比较分子的大小，完整误差还要处理无穷多个修正项的叠加。</p>
+          <p>对素数计数函数，有一个严格的等价说法：<strong>黎曼猜想成立，当且仅当估计误差 <span class="math">|π(<var>x</var>) − Li₂(<var>x</var>)|</span> 在充分大的 <var>x</var> 上，始终不超过 <span class="math">√<var>x</var> ln <var>x</var></span> 的某个固定常数倍。</strong> 这说的是整段区间里的素数总数能估得多准。<sup><a href="#ref-clay" aria-label="参考资料 5">[5]</a></sup></p>
+
+          <p><a href="#architect">沿显式公式算一遍 10 以内的例子 →</a></p>
+        </section>
+      </div>
+
+      <section id="architect" class="chapter" aria-labelledby="architect-title">
+        <h2 id="architect-title">从欧拉乘积到素数计数</h2>
+        <p>要把 ζ 的零点和素数计数联系起来，可以先计算 <span class="math">ψ(<var>x</var>)</span>。每个不超过 <var>x</var> 的素数幂 <span class="math"><var>p</var><sup><var>k</var></sup></span> 贡献一次 <span class="math">ln <var>p</var></span>。以 <var>x</var> = 10 为例，直接加权计数得到约 7.8320。沿 ζ 函数也能得到同一个结果。</p>
+        <figure class="arch-overview" aria-labelledby="riemann-flow">
+          <figcaption id="riemann-flow">沿 ζ 函数计算 ψ(10) 的步骤</figcaption>
+          <ol class="arch-flow" role="list">
+            <li><strong>欧拉乘积</strong><span>每个因子对应一个素数。取负对数导数后得到素数幂及其权重。</span></li>
+            <li><strong>复积分反演</strong><span>乘上含 <var>x</var> 的积分核，把无穷级数变为只计到 10 的和。</span></li>
+            <li><strong>求出修正项</strong><span>移动积分路径。极点给出主项 10，每个非平凡零点给出一个修正项。</span></li>
+          </ol>
+        </figure>
+        <table class="arch-table">
+          <caption>改变条件后，公式能说明什么</caption>
+          <thead><tr><th scope="col">条件</th><th scope="col">结果</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">只取第一对共轭零点</th><td>前几个已知项给出约 7.7561，剩余零点的贡献仍需计入。</td></tr>
+            <tr><th scope="row">把上限从 10 改成 9</th><td>9 是素数幂。显式公式在这个跳点给出两侧的平均值，包含半份 ln 3。</td></tr>
+            <tr><th scope="row">所有零点的实部等于 1/2</th><td>各修正项的分子大小都是 √<var>x</var>。再控制这些项的总和，可推出 <span class="math">|π(<var>x</var>) − Li₂(<var>x</var>)| = O(√<var>x</var> ln <var>x</var>)</span>。反过来，这个误差界也蕴含黎曼猜想。</td></tr>
+          </tbody>
+        </table>
+        <details class="deep-dive" id="architect-formula">
+          <summary>负对数导数与显式公式</summary>
+          <p>在 <span class="math">Re(<var>s</var>) &gt; 1</span>，欧拉乘积给出 <span class="math">−ζ′(<var>s</var>)/ζ(<var>s</var>) = ∑<sub><var>p</var>,<var>k</var>≥1</sub> ln(<var>p</var>) <var>p</var><sup>−<var>ks</var></sup></span>，其中 <var>p</var> 遍历素数。把它乘上积分核 <span class="math"><var>x</var><sup><var>s</var></sup>/<var>s</var></span>，沿右侧竖线做反演积分。将积分路径向左移动时，ζ 在 <var>s</var> = 1 的极点给出主项 <var>x</var>，非平凡零点给出修正项。<sup><a href="#ref-explicit" aria-label="参考资料 6">[6]</a></sup></p>
+          <p>先按 <span class="math">ln <var>p</var></span> 的权重数不超过 <var>x</var> 的素数幂 <span class="math"><var>p</var><sup><var>k</var></sup></span>，得到函数 <span class="math">ψ(<var>x</var>)</span>。在跳跃点，用跳前和跳后的平均值定义 <span class="math">ψ₀(<var>x</var>)</span>。对 <var>x</var> &gt; 1，冯·曼戈尔特显式公式是：</p>
+          <p class="formula long-formula"><span>ψ₀(<var>x</var>) = <var>x</var></span> <span>− ∑<sub>ρ</sub> <var>x</var><sup>ρ</sup>/ρ</span> <span>− ln(2π)</span> <span>− ½ ln(1 − <var>x</var><sup>−2</sup>)</span></p>
+          <p>这里的求和按重数计入非平凡零点，并把虚部的绝对值限制在同一高度内，再让该高度趋于无穷。公式左侧是带权计数，需再处理素数幂和权重，才能回到 <span class="math">π(<var>x</var>)</span>。公式中 <span class="math">ln(2π)</span> 的 π 是圆周率。<sup><a href="#ref-explicit" aria-label="参考资料 6">[6]</a></sup></p>
+          <p>把 <var>x</var> 设为 10。直接列出素数幂 <span class="math">2、3、4、5、7、8、9</span>，分别加上底数的自然对数，可得 <span class="math">ψ₀(10) ≈ 7.8320</span>。在右侧，先算主项和两个对数项，合计约 8.1671。第一对共轭零点的贡献是 −0.4110，加入后得到约 7.7561。这个截断示例展示了一对零点怎样改变估计。</p>
+        </details>
+      </section>
+
+      <section class="chapter references" id="references" aria-labelledby="references-title">
+        <h2 id="references-title">参考资料</h2>
+        <ol>
+          <li id="ref-primes"><a href="https://dlmf.nist.gov/27.12">NIST DLMF §27.12 · 素数定理与对数积分估计</a></li>
+          <li id="ref-zeta"><a href="https://dlmf.nist.gov/25.2">NIST DLMF §25.2 · ζ 函数的定义、延拓和欧拉乘积</a></li>
+          <li id="ref-zeros"><a href="https://dlmf.nist.gov/25.10">NIST DLMF §25.10 · ζ 函数的零点</a></li>
+          <li id="ref-verification"><a href="https://arxiv.org/abs/2004.09765">Platt 与 Trudgian · 黎曼猜想在高度 3 × 10¹² 以内的严格数值核验</a></li>
+          <li id="ref-clay"><a href="https://www.claymath.org/millennium/riemann-hypothesis/">Clay Mathematics Institute · 黎曼猜想与 Bombieri 的官方问题说明</a></li>
+          <li id="ref-explicit"><a href="https://doi.org/10.1017/CBO9780511618314">Montgomery 与 Vaughan，《Multiplicative Number Theory I》第 12 章 · 显式公式</a></li>
+        </ol>
+      </section>
+    </div>
+  </main>
+
+  <footer class="frame footer">
+    <a href="../../">← 返回主题目录</a>
+    <span data-pageviews="page">本页浏览量（PV） <span data-pv-value aria-live="polite">—</span></span>
+    <a href="#main">回到正文 ↑</a>
+  </footer>
+</body>
+</html>
