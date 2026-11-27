@@ -7,6 +7,7 @@
   <title>pstack Skill 原理 · 理解万物</title>
   <link rel="stylesheet" href="../../assets/flow-motion.css">
   <link rel="stylesheet" href="assets/topic.css">
+  <link rel="stylesheet" href="../../assets/architecture.css">
   <script defer src="../../assets/perspectives.js"></script>
   <script defer src="../../assets/flow-motion.js"></script>
   <script defer src="assets/demo.js"></script>
@@ -20,7 +21,7 @@
       <nav aria-label="页内导航">
         <a href="#system-architecture">架构图</a>
         <a href="#workflow-demo">流程演示</a>
-        <a href="#perspectives">讲解视角</a>
+        <a href="#architect">架构师速览</a>
         <a href="#references">参考资料</a>
       </nav>
     </div>
@@ -137,34 +138,64 @@
 
       <section id="architect" class="perspective-panel" aria-labelledby="architect-title">
         <h3 id="architect-title">工作流由 Markdown 描述，由宿主工具执行</h3>
-        <p>以 Claude Code 插件为例。注册、文本注入和工具调用发生在不同阶段。通知设置故障会依次经过路由、流程选择、调查与实现、验收。<sup><a href="#ref-hook" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup></p>
+        <p>以 Claude Code 插件为例。pstack 提供路由指令与流程约定，宿主提供会话、工具和权限，模型负责选路，主 Agent 根据实际证据验收。<sup><a href="#ref-hook" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup></p>
 
-        <dl class="design-list">
-          <div>
-            <dt>会话钩子提供入口</dt>
-            <dd><code>hooks/hooks.json</code> 在启动、恢复、清空或压缩会话时调用 <code>session-start.sh</code>。启用时，脚本返回 <code>session-start-context.md</code> 的路由文本。模型负责据此选择路径。原因未知、涉及多文件或设计取舍等任务进入 <code>poteto-mode</code>，有明显验证办法的单文件小改直接完成，用户明确要求 <code>tdd</code> 等专门 Skill 则直接加载该 Skill。<sup><a href="#ref-hook" aria-label="来源 2">[2]</a></sup></dd>
-          </div>
-          <div>
-            <dt>Playbook 按需组合，清单记录进度</dt>
-            <dd><code>poteto-mode/SKILL.md</code> 先按任务选 <code>playbooks/bug-fix.md</code> 或 <code>feature.md</code>，把步骤放入宿主待办，缺少待办工具时可用未提交的 Markdown 清单。遇到需要验证的判断再读对应的 <code>principle-*</code>，例如 <code>principle-prove-it-works</code>。项目 Playbook 可以用 <code>extends</code> 扩展内置步骤，<code>check-playbooks.mjs</code> 会检查版本变动后引用的步骤是否仍存在。<sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup><sup><a href="#ref-playbooks" aria-label="来源 6">[6]</a></sup></dd>
-          </div>
-          <div>
-            <dt>主 Agent 持有验收责任</dt>
-            <dd>主 Agent 亲自复现、界定调查或实现任务，并将 <code>worker.md</code> 的路径传给子 Agent。Claude Code 可使用 <code>pstack:poteto-agent</code>。子 Agent 回传证据或改动，主 Agent 审 diff 并在原界面复测。如果改动涉及接口、所有权或数据语义，Bug fix Playbook 会先走 <code>architect</code>。涉及安全或数据完整性约束的代码还需要独立正确性审查。即便原界面复测通过，也要等到该审查完成后才能标记为可合并。<sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup><sup><a href="#ref-bugfix" aria-label="来源 4">[4]</a></sup><sup><a href="#ref-worker" aria-label="来源 5">[5]</a></sup></dd>
-          </div>
-          <div>
-            <dt>验收看同一路径上的行为</dt>
-            <dd>如果有便宜的回归测试路径，<code>tdd</code> 先确认修复前因预期的值不匹配而失败，再确认修复后通过。通知设置的界面复测依然要执行「关闭 → 保存 → 刷新」。只测保存函数时，浏览器的数据依然有可能恢复成旧值，按原故障路径判断应记作未确认。<sup><a href="#ref-bugfix" aria-label="来源 4">[4]</a></sup><sup><a href="#ref-tdd" aria-label="来源 7">[7]</a></sup></dd>
-          </div>
-        </dl>
+        <figure class="arch-overview" aria-labelledby="pstack-arch-flow">
+          <figcaption id="pstack-arch-flow">未知故障的状态怎么流动</figcaption>
+          <ol class="arch-flow" role="list">
+            <li><strong>会话收到规则</strong><span>宿主运行 <code>SessionStart</code> 加入路由文本，模型读取任务时看到规则。</span></li>
+            <li><strong>主 Agent 登记待办</strong><span>将 Bug fix Playbook 的步骤放入宿主待办，记录跳过的步骤和原因。</span></li>
+            <li><strong>宿主执行工具</strong><span>主 Agent 发出带范围的子任务，子 Agent 回传故障观测或代码改动。</span></li>
+            <li><strong>主 Agent 核验证据</strong><span>在原界面复测，依据观察结果判断故障是否消失。</span></li>
+          </ol>
+        </figure>
 
-        <h4>同一套 Skill 怎样跑在不同宿主？</h4>
-        <p>各移植版共享 <code>plugins/pstack/skills/</code>。Markdown 以 Claude Code 的工具词汇为主，移植版为各宿主提供映射。比如在 Codex，<code>Agent</code> 的委派动作映射为 <code>spawn_agent</code>，插件钩子需受信任才运行。在 <a href="../deepseek-harness/">DeepSeek Harness</a>，skills-only 装法提供共享技能及配套脚本等文件。用户显式请求 <code>poteto-mode</code>，委派使用宿主暴露的 <code>subagent</code> 等工具。<sup><a href="#ref-port" aria-label="来源 8">[8]</a></sup><sup><a href="#ref-codex" aria-label="来源 9">[9]</a></sup><sup><a href="#ref-dsh" aria-label="来源 10">[10]</a></sup></p>
-        <p>移植仓库同步 Cursor 上游时，先应用 Cursor 到 Claude Code 的机械转换，再保留 <code>tools/forks.json</code> 明示的宿主适配或工作流差异。这样，共用的 Skill 只维护一份，宿主之间的工具差异由各自的映射处理。<sup><a href="#ref-port" aria-label="来源 8">[8]</a></sup></p>
-        <div class="callout">
-          <h4>设计取舍</h4>
-          <p>按需加载便于复用流程，也让一项任务只读需要的规则。代价是路由和大部分步骤依赖模型遵守指令，跨宿主还要核对工具和权限。脚本能检查步骤锚点等可机械判定的条件。真实行为是否修好，仍需看实际执行产生的证据。<sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup><sup><a href="#ref-playbooks" aria-label="来源 6">[6]</a></sup></p>
-        </div>
+        <table class="arch-table">
+          <caption>哪些任务走哪条路径，凭什么验收</caption>
+          <thead>
+            <tr><th scope="col">触发条件</th><th scope="col">模型选择</th><th scope="col">验收依据</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">故障原因未知</th><td><code>poteto-mode</code> → Bug fix Playbook</td><td>关闭通知、保存、刷新后仍为关闭</td></tr>
+            <tr><th scope="row">有显而易见验证方法的单文件小改</th><td>直接修改</td><td>设置页显示新标题</td></tr>
+            <tr><th scope="row">用户要求测试先行</th><td>直接加载 <code>pstack:tdd</code></td><td>同一回归测试修复前按预期失败，修复后通过</td></tr>
+          </tbody>
+        </table>
+
+        <p><strong>验收与合并就绪。</strong> 原界面仍复现就回到定位，只有单测通过就继续在原界面验收。改动执行安全或数据完整性约束的代码时，复测通过后仍须独立正确性审查，才能标记为可合并。<sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup><sup><a href="#ref-bugfix" aria-label="来源 4">[4]</a></sup><sup><a href="#ref-tdd" aria-label="来源 7">[7]</a></sup></p>
+
+        <details class="arch-detail" id="architect-hooks">
+          <summary>注入规则、加载 Skill 与保存待办</summary>
+          <div class="arch-detail-body">
+            <p><code>hooks/hooks.json</code> 在启动、恢复、清空或压缩会话时调用 <code>session-start.sh</code>。启用时，脚本返回 <code>session-start-context.md</code> 的路由文本。模型将原因未知、多文件、设计取舍和性能问题等任务交给 <code>poteto-mode</code>。如用户明确要求 <code>tdd</code>，会直接加载该 Skill。<sup><a href="#ref-hook" aria-label="来源 2">[2]</a></sup></p>
+            <p><code>poteto-mode/SKILL.md</code> 先选 <code>playbooks/bug-fix.md</code> 或 <code>feature.md</code> 等流程，把步骤放入宿主待办。可用的 Claude Code 工具包括 <code>TaskCreate</code> 和 <code>TaskUpdate</code>，或已配置的 <code>TodoWrite</code>。没有待办工具时会使用未提交的 Markdown 清单，照录步骤并标记 <code>skip: &lt;reason&gt;</code>。<sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup></p>
+            <p>模型按判断加载 <code>principle-*</code>，例如 <code>principle-prove-it-works</code>。项目 Playbook 可用 <code>extends</code> 扩展内置步骤，<code>check-playbooks.mjs</code> 会验证扩展引用的步骤是否仍存在。<sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup><sup><a href="#ref-playbooks" aria-label="来源 6">[6]</a></sup></p>
+          </div>
+        </details>
+
+        <details class="arch-detail" id="architect-playbook">
+          <summary>Bug fix Playbook 的完整步骤</summary>
+          <div class="arch-detail-body">
+            <ol class="checklist">
+              <li><strong>在原界面复现。</strong> 主 Agent 操作关闭通知、保存、刷新，确认通知重新开启。</li>
+              <li><strong>排除候选原因。</strong> 在示例里，保存后直接读记录仍是开启，准备一条已关闭的记录后，刷新能显示关闭。这把调查范围缩小到保存路径。</li>
+              <li><strong>规划并委派修复。</strong> 主 Agent 界定任务，将 <code>worker.md</code> 路径传给 <code>pstack:poteto-agent</code>，审查回传的 diff。跨函数边界时通常先运行 <code>architect</code>。涉及接口、所有权、数据语义等变化的修复必须先过该步骤。</li>
+              <li><strong>重复原界面操作。</strong> 保存后刷新仍是关闭，才有原故障路径通过的证据。只测保存函数，仍需查界面有没有用到结果、刷新能否读到新值。</li>
+              <li><strong>整理可验证的提交。</strong> 有低成本的回归测试路径时，验证同一用例修复前按预期失败、修复后通过。把失败用例的提交排在修复之前。成本高或路径不明时采用可行的复现检查，并说明取舍。</li>
+              <li><strong>进入 Opening a PR Playbook。</strong> 记录故障、根因、修复和验证依据。执行安全或数据完整性约束的代码有改动时，还要等独立审查。主 Agent 的自审与 CI 无法代替这项审查。</li>
+            </ol>
+            <p>步骤按上游 Playbook 概括，设置页与观测值是教学示例。<sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup><sup><a href="#ref-bugfix" aria-label="来源 4">[4]</a></sup><sup><a href="#ref-worker" aria-label="来源 5">[5]</a></sup><sup><a href="#ref-tdd" aria-label="来源 7">[7]</a></sup></p>
+          </div>
+        </details>
+
+        <details class="arch-detail" id="architect-hosts">
+          <summary>宿主移植、设计取舍与源码</summary>
+          <div class="arch-detail-body">
+            <p>各移植版共享 <code>plugins/pstack/skills/</code>。Markdown 以 Claude Code 的工具词汇为主，各宿主提供映射。在 Codex，<code>Agent</code> 的委派动作映射为 <code>spawn_agent</code>，插件钩子需受信任才运行。在 <a href="../deepseek-harness/">DeepSeek Harness</a>，skills-only 装法提供共享技能及配套脚本等文件。用户显式请求 <code>poteto-mode</code>，委派使用宿主暴露的 <code>subagent</code> 等工具。<sup><a href="#ref-port" aria-label="来源 8">[8]</a></sup><sup><a href="#ref-codex" aria-label="来源 9">[9]</a></sup><sup><a href="#ref-dsh" aria-label="来源 10">[10]</a></sup></p>
+            <p>移植仓库同步 Cursor 上游时先应用机械转换，再保留 <code>tools/forks.json</code> 明示的工具适配或流程差异。共享的技能正文可以维护在一处，各宿主的工具差异由映射处理。<sup><a href="#ref-port" aria-label="来源 8">[8]</a></sup></p>
+            <p><strong>设计取舍。</strong> 按需加载降低一项任务需要读取的规则量，使流程可复用。路由和执行仍依赖模型遵守指令，跨宿主时尤其要核对工具和权限。脚本可检查步骤引用，实际故障是否修复则由运行证据判定。<sup><a href="#ref-router" aria-label="来源 3">[3]</a></sup><sup><a href="#ref-playbooks" aria-label="来源 6">[6]</a></sup></p>
+          </div>
+        </details>
       </section>
     </section>
 

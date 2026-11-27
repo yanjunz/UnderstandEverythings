@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="assets/base.css" />
     <link rel="stylesheet" href="../../assets/flow-motion.css" />
     <link rel="stylesheet" href="assets/magpie.css" />
+    <link rel="stylesheet" href="../../assets/architecture.css" />
     <script defer src="../../assets/perspectives.js"></script>
     <script defer src="../../assets/flow-motion.js"></script>
     <script defer src="assets/magpie.js"></script>
@@ -65,6 +66,7 @@
               <a href="#journey" class="button primary"
                 >观看核心动画 <span class="arrow" aria-hidden="true">↓</span></a
               >
+              <a href="#architecture" class="button">架构师速览</a>
               <a href="#questions" class="button">读者问题</a>
             </div>
           </div>
@@ -484,104 +486,85 @@
         >
           <h2 id="architecture-title">架构师 · 本地网关的接口与状态</h2>
           <section id="gateway-architecture" class="lesson-section">
-            <div class="section-heading"><h3>沿着一次调用划分职责</h3></div>
-            <p class="section-lead">
-              以 Claude Code 经 Magpie 调用 DeepSeek 为例。Agent 按 Anthropic
-              Messages 的接口发送「解释一下这个函数」，目标模型通过 Chat
-              Completions 提供服务。这个案例采用普通模型 API 路径。<a
-                href="#ref-routing"
-                >路由实现</a
-              >
+            <div class="section-heading"><h3>一条请求经过两道鉴权边界</h3></div>
+            <p class="section-lead magpie-arch-lead">
+              以 Claude Code 经 Magpie 调用配置为 Chat Completions 的 DeepSeek 为例。<a href="#journey">查看鉴权动画</a>
             </p>
-            <dl class="architecture-grid">
+            <figure class="arch-overview">
+              <figcaption>普通模型 API 的请求与回程</figcaption>
+              <ol class="arch-flow">
+                <li><strong>Agent 构建请求</strong><span>按客户端配置发 <code>POST /v1/messages</code>，带模型标识和消息。</span></li>
+                <li><strong>Magpie 检查入口</strong><span>普通回环无需共享 key。远程共享校验 Gateway key。</span></li>
+                <li><strong>Magpie 选路和转码</strong><span>解析 <code>deepseek/deepseek-chat</code>，选定供应商、模型与账号，按需转成 Chat。</span></li>
+                <li><strong>上游验证并生成</strong><span>DeepSeek 验自己的 API key。流式回复由 Magpie 适配回 Messages。</span></li>
+              </ol>
+            </figure>
+            <dl class="magpie-arch-pair">
               <div>
-                <dt>接入配置</dt>
-                <dd>
-                  <code>internal/agent</code> 按 Agent
-                  的配置格式设置入口地址、认证和模型，并记录原设置以供断开时恢复。这个阶段建立本地入口指向。<a
-                    href="#ref-wiring"
-                    >Agent wiring</a
-                  >
-                  · <a href="#agent-gateway-auth">配置和认证实例</a>
-                </dd>
+                <dt>控制面 · 接入前配置</dt>
+                <dd>Agent 配置的 Base URL 指向 Magpie。Magpie 的供应商配置保存上游地址、协议、模型和凭据。</dd>
               </div>
               <div>
-                <dt>请求路由</dt>
-                <dd>
-                  网关根据请求的模型或路由组，从已配置的服务商、账号和模型中选出候选。会话亲和性可以让连续请求留在已有账号上。<a
-                    href="#ref-routing"
-                    >Gateway routing</a
-                  >
-                </dd>
-              </div>
-              <div>
-                <dt>协议适配</dt>
-                <dd>
-                  跨协议时，入口解析为 <code>Request</code> 和
-                  <code>Part</code
-                  >，再按上游协议构造请求。回程将流式事件重新编码回 Agent
-                  的协议。<a href="#ref-ir">中间表示源码</a>
-                </dd>
+                <dt>数据面 · 请求状态</dt>
+                <dd>同一会话可优先沿用可用账号。候选状态和回复是否已发出共同决定能否切换。</dd>
               </div>
             </dl>
-            <div class="request-walkthrough">
-              <h4>跟着字段走一次</h4>
-              <ol>
-                <li>
-                  <strong>入口读取请求。</strong> Claude Code 向本机的
-                  <code>/v1/messages</code> 发送
-                  <code>model: deepseek/deepseek-chat</code
-                  >、用户消息和输出上限。入口路径决定如何解析字段，调用方身份可以另行归因。<a
-                    href="#ref-routing"
-                    >入口与调用方</a
-                  >
-                </li>
-                <li>
-                  <strong>路由确定下一跳。</strong>
-                  网关从供应商配置取目标协议、基础地址和认证方式。假设 DeepSeek
-                  上游只提供 Chat Completions，转发请求的
-                  <code>model</code> 对应上游的
-                  <code>deepseek-chat</code>，消息与输出上限也按目标 API
-                  编码。<a href="#ref-routing">候选选择</a> ·
-                  <a href="#ref-ir">字段表示</a>
-                </li>
-                <li>
-                  <strong>回程保留关联。</strong>
-                  比如模型流式返回工具名称和分段参数，转回 Messages
-                  时需要把这些分片放回同一次工具调用，并保留调用标识。普通模型
-                  API 路径中，Agent 收到这条工具请求后才决定是否执行。<a
-                    href="#ref-ir"
-                    >流式事件</a
-                  >
-                  · <a href="#boundaries">执行边界</a>
-                </li>
-                <li>
-                  <strong>失败点决定是否可换上游。</strong>
-                  如果上游在任何回复发给 Agent
-                  前返回可重试错误，网关可以尝试下一位候选。已经发出部分回复时，客户端已有流式状态，需要按该路径的失败行为处理。Routing
-                  记录可以用来核对实际候选和响应方。<a href="#ref-routing"
-                    >失败分支</a
-                  >
-                </li>
-              </ol>
-            </div>
-            <p class="architecture-note">
-              <strong>设计取舍。</strong
-              >共用中间表示可以让各协议共用路由与转发逻辑。集成时仍要验证工具调用标识、结束信号和目标模型的能力。故障切换也取决于客户端是否已经收到回复，开始输出后需要保留已发送内容的语义。<a
-                href="#ref-routing"
-                >故障行为</a
-              >
-              · <a href="#ref-ir">协议表示</a>
-            </p>
+
+            <table class="arch-table magpie-diagnostics">
+              <caption>按拒绝位置排查</caption>
+              <thead>
+                <tr><th scope="col">现象</th><th scope="col">请求走到哪</th><th scope="col">先核对</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Magpie 入口 401</th>
+                  <td>远程共享入口拒绝，未尝试任何上游。</td>
+                  <td>Agent 发给 Magpie 的 Gateway key。</td>
+                </tr>
+                <tr>
+                  <th scope="row">上游 401</th>
+                  <td>入口通过，已联系目标服务。单一候选时失败回给 Agent。</td>
+                  <td>选中供应商的 API key 或登录账号。</td>
+                </tr>
+                <tr>
+                  <th scope="row">上游 429</th>
+                  <td>回复未发出、错误可重试且有备用候选时，可尝试下一位。</td>
+                  <td>路由记录里的候选、额度和限额。</td>
+                </tr>
+                <tr>
+                  <th scope="row">流已开始后失败</th>
+                  <td>客户端已有部分回复。</td>
+                  <td>已发出的事件和结束状态。另一路模型的结果不能直接拼接。</td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="magpie-arch-links"><a href="#ref-entry-auth">入口规则源码</a> · <a href="#ref-routing">候选与状态实现</a></p>
+
+            <details class="arch-detail">
+              <summary>配置写在哪里，模型如何选中</summary>
+              <dl class="magpie-arch-facts">
+                <div>
+                  <dt>Agent 端</dt>
+                  <dd><code>internal/agent</code> 按客户端格式写入地址、模型及所需入口凭据，记录原设置用于断开时恢复。自研客户端可自行改地址。<a href="#agent-gateway-auth">Codex 与 Claude Code 的字段对照</a> · <a href="#ref-wiring">接入实现</a></dd>
+                </div>
+                <div>
+                  <dt>Magpie 端</dt>
+                  <dd>API 供应商在 <code>providers.json</code> 中绑定地址与凭据。请求的模型标识或路由组决定候选。入口路径、调用凭据和 User-Agent 可用来识别 Agent。<a href="#custom-gateway">私有上游的配置例子</a> · <a href="#ref-providers">供应商实现</a></dd>
+                </div>
+              </dl>
+            </details>
           </section>
 
-          <section id="translation" class="lesson-section">
-            <div class="section-heading"><h3>请求和流式回复如何转换</h3></div>
-            <p class="section-lead">
-              不同 API 对同一个问题，用的字段名和事件格式不一样。Magpie
-              在需要跨协议时，先读成共同的内部结构，再写成对方能理解的格式。
+          <details id="translation" class="arch-detail lesson-section magpie-lab">
+            <summary>
+              <strong>协议转换实验</strong>
+              <span>统一内部结构让多协议共用同一路由。适配时仍要保留工具调用和流结束的语义。</span>
+            </summary>
+            <p class="section-lead magpie-arch-lead">
+              切换客户端，比较同一句消息怎么经过「协议 A → 统一内部结构（IR）→ 协议 B」。
+              流式回复沿反方向转换。<a href="#ref-ir">内部结构源码</a>
             </p>
-            <div class="experiment translation-experiment">
+            <div class="experiment translation-experiment" hidden>
               <div class="experiment-header">
                 <span>协议翻译台</span
                 ><span class="simulation-label">精简字段示意 · 非完整请求</span>
@@ -667,42 +650,24 @@
                 ></p>
               </div>
             </div>
-            <div class="translation-notes">
-              <p>
-                <strong>为什么不能只改模型名字？</strong
-                >因为请求字段、工具调用、推理内容和流式事件都可能不同。回复也需要反向转换，Agent
-                才能继续读取。
-              </p>
-              <p>
-                <strong>每次都翻译吗？</strong>不一定。双方 API
-                兼容、条件允许时，可以走原生转发路径；跨协议转换也无法补出目标模型本来没有的能力。
-              </p>
-            </div>
-            <div class="stream-strip">
-              <span class="stream-icon" aria-hidden="true">≋</span>
-              <div>
-                <h4>流式回复也要边收边翻译</h4>
-                <p>
-                  服务端发来一小段 → 解码为内部事件 → 编码成 Agent 的事件格式 →
-                  立即向下传递。工具调用的名称、参数和结束信号同样需要正确对齐。
-                </p>
-              </div>
-              <div class="stream-sample" aria-hidden="true">
-                <span>这</span><span>个</span><span>函</span><span>数</span
-                ><i></i>
-              </div>
-            </div>
-          </section>
+            <noscript>
+              <p>静态示例中，Responses 的 <code>input[].content[].text</code> 和 Gemini 的 <code>contents[].parts[].text</code> 可转成 Chat 的 <code>messages[].content</code>。角色和文字含义保持一致。</p>
+            </noscript>
+            <details class="arch-detail">
+              <summary>流式回复如何保留同一次工具调用</summary>
+              <p><code>Request</code> 和 <code>Part</code> 统一表示输入。回程把流解码为内部 <code>Event</code>，再写回客户端格式。工具名、分段参数和调用 ID 要对应同一次调用，结束信号也要对齐。兼容协议可走原生转发路径。<a href="#ref-ir">请求与事件结构</a> · <a href="#ref-routing">转发路径</a></p>
+            </details>
+          </details>
 
-          <section id="routing" class="lesson-section">
-            <div class="section-heading"><h3>额度耗尽时如何切换</h3></div>
-            <p class="section-lead">
-              你可以把多个模型放进一个「路由组」，让 Agent
-              只选这个组。下面用最容易理解的
-              <code>order</code>
-              模式实验：按顺序尝试，前一个不能回答才找下一个。
+          <details id="routing" class="arch-detail lesson-section magpie-lab">
+            <summary>
+              <strong>路由与故障切换实验</strong>
+              <span>输出前遇到可重试错误，才有机会尝试下一候选。能否切换还要看账号是否可用。</span>
+            </summary>
+            <p class="section-lead magpie-arch-lead">
+              Agent 只选路由组。实验在 <code>order</code> 模式下模拟首选输出前返回 429，试试有备用和无备用的区别。
             </p>
-            <div class="experiment routing-experiment">
+            <div class="experiment routing-experiment" hidden>
               <div class="experiment-header">
                 <span
                   ><span class="route-symbol">⑂</span> group /
@@ -770,88 +735,43 @@
                 </div>
               </div>
             </div>
-            <div class="routing-footnotes">
-              <p>
-                <b>切换有前提。</b
-                >需要存在可用候选，且失败适合重试。只有一个账号、没有后备时，错误仍会返回
-                Agent。
-              </p>
-              <p>
-                <b>中途不能随意接力。</b
-                >这个实验模拟的是<strong>回复尚未对客户端输出</strong>时的失败；已经输出部分回复，不能当作从未发生过，直接拼上另一个模型的答案。
-              </p>
-            </div>
-            <details class="glossary">
-              <summary>除了顺序，还有哪些路由思路？ <span>＋</span></summary>
-              <dl>
-                <div>
-                  <dt>smart</dt>
-                  <dd>
-                    在还有额度的订阅里，优先选择更快重置的，减少额度浪费。
-                  </dd>
-                </div>
-                <div>
-                  <dt>rotate / usage</dt>
-                  <dd>分别是每轮轮换成员，以及优先选择用量较少的成员。</dd>
-                </div>
-                <div>
-                  <dt>会话亲和性</dt>
-                  <dd>
-                    为保留上下文缓存，连续对话可能留在已有账号上；真实选择还要综合账号状态和组设置。
-                  </dd>
-                </div>
-              </dl>
+            <noscript>
+              <p>首选账号成功时直接返回。首选在输出前返回可重试的 429 时，有备用就试备用，没有备用就将错误返回。已发出的部分回复会留在客户端。</p>
+            </noscript>
+            <details class="arch-detail">
+              <summary>路由策略怎样影响候选顺序</summary>
+              <ul>
+                <li><code>order</code> 按配置顺序。<code>rotate</code> 轮换成员，<code>usage</code> 优先用量较少的成员。</li>
+                <li><code>smart</code> 可优先消耗快重置的订阅额度。会话亲和性偏向已有账号，有助于复用上下文缓存。</li>
+                <li>实际候选还受账号状态、可用模型和组设置影响。用 Routing 记录核对尝试顺序和响应方。<a href="#ref-routing">路由策略与状态</a></li>
+              </ul>
             </details>
-          </section>
+          </details>
 
           <section id="boundaries" class="lesson-section">
             <div class="section-heading">
               <h3>普通 API、订阅桥接与隐私边界</h3>
             </div>
-            <div class="boundary-grid">
-              <div class="boundary-card">
-                <span class="boundary-num">A</span>
-                <h4>执行工具，通常还是 Agent 的工作</h4>
-                <p>
-                  模型可以返回「调用 read_file」的结构化请求。Magpie 把它转成
-                  Agent 理解的格式，由 Agent
-                  检查权限并执行，再把结果带到下一轮。
-                </p>
-                <div class="tool-loop">
-                  <span>模型提出调用</span><b>→</b><span>Agent 执行</span
-                  ><b>→</b><span>结果进入下一轮</span>
-                </div>
-                <p class="fine-print">
-                  这是普通模型 API 路径。Magpie 另有
-                  MCP、内置工具和订阅桥接等功能，不能把所有路径都等同于这一条。
-                </p>
-              </div>
-              <div class="boundary-card">
-                <span class="boundary-num">B</span>
-                <h4>订阅接入，不全是直接转发 HTTP</h4>
-                <p>
-                  API key 服务商、本地模型和订阅账号的接入方式不同。例如 Claude
-                  订阅路径会驱动本地真正的 <code>claude</code> 程序，并通过 MCP
-                  桥接工具。
-                </p>
-                <p class="fine-print">
-                  MCP 是连接工具与 AI
-                  应用的一种协议。理解主干后，再研究具体订阅的认证与进程管理，会更容易。
-                </p>
-              </div>
-            </div>
-            <div class="privacy-note">
-              <span aria-hidden="true">◇</span>
+            <dl class="magpie-arch-pair">
               <div>
-                <h4>
-                  「本地网关」意味着请求先经过本机，不等于全部在本地推理。
-                </h4>
-                <p>
-                  选择云端模型时，请求仍会离开电脑。Magpie
-                  有可选的隐私脱敏功能，默认关闭；开启后会尝试把识别到的敏感值换成占位符，回复时再还原。它不是「任何信息都不会外传」的保证。
-                </p>
+                <dt>普通模型 API</dt>
+                <dd>模型提出工具调用 → Magpie 转换并返回 → Agent 检查权限、执行并发起下一轮。</dd>
               </div>
-            </div>
+              <div>
+                <dt>Claude 订阅</dt>
+                <dd>Magpie 驱动本地 <code>claude</code> 进程，沿用订阅账号，由 MCP 桥接工具调用。<a href="#ref-claude-bridge">订阅桥接实现</a></dd>
+              </div>
+            </dl>
+            <p class="magpie-privacy"><strong>数据去向</strong> 走云端上游时请求会出本机。本地脱敏是可选功能，默认关闭。</p>
+            <details class="arch-detail">
+              <summary>设计取舍与能力边界</summary>
+              <ul>
+                <li>统一 IR 让多协议共用路由逻辑。代价是适配层要正确映射调用 ID、参数和事件，结果仍受目标模型能力限制。</li>
+                <li>账号亲和性有利于缓存复用，故障切换则要兼顾账号状态和客户端已经看到的结果。</li>
+                <li>Claude 订阅桥接要管理进程和会话，Magpie 的内置工具也有自己的路径。普通 API 的分工适用于上面示例。</li>
+                <li>脱敏开启时，用占位符替换识别到的内容，回复时还原。保护范围取决于识别覆盖。<a href="sources.md">实现与边界对照</a></li>
+              </ul>
+            </details>
           </section>
         </section>
 
@@ -1050,103 +970,106 @@ Magpie 自定义供应商  my-gateway
             <a
               href="https://github.com/yetone/magpie/tree/9314999a4a771eccda4888d3fa7cde84e8bef855"
               ><code>yetone/magpie @ 9314999</code> ↗</a
-            >。交互为简化教学模型，省略了缓存、限流和各服务商的特殊处理；项目更新后，行为可能变化。
+            >。交互为简化教学模型。实际实现还包括缓存、限流和各服务商的特殊处理。
           </p>
-          <div class="source-links">
-            <a
-              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/README.zh-CN.md"
-              ><div>
-                <strong>先看：项目官方介绍</strong
-                ><small>整体架构、支持的协议与路由模式</small>
-              </div>
-              <b>↗</b></a
-            ><a
-              id="ref-wiring"
-              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/docs/subsystems/agent-wiring.md"
-              ><div>
-                <strong>接入：Agent wiring</strong
-                ><small>如何修改、记录和恢复 Agent 配置</small>
-              </div>
-              <b>↗</b></a
-            ><a
-              id="ref-routing"
-              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/docs/subsystems/gateway-routing.md"
-              ><div>
-                <strong>深入：Gateway routing</strong
-                ><small>请求路由、候选选择和故障行为</small>
-              </div>
-              <b>↗</b></a
-            ><a
-              id="ref-ir"
-              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/ir.go"
-              ><div>
-                <strong>源码：统一内部结构</strong
-                ><small>Request、Part 和流式 Event 的表示</small>
-              </div>
-              <b>↗</b></a
-            >
-            <a
-              id="ref-providers"
-              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/docs/subsystems/providers-accounts.md"
-            >
-              <div>
-                <strong>供应商与账号</strong
-                ><small>自定义地址、模型列表、协议与凭据</small>
-              </div>
-              <b>↗</b>
-            </a>
-            <a
-              id="ref-caller"
-              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/gateway.go#L55-L84"
-            >
-              <div>
-                <strong>源码：识别调用方</strong
-                ><small>agentOf 如何解析请求来源</small>
-              </div>
-              <b>↗</b>
-            </a>
-            <a
-              id="ref-codex-wiring"
-              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/agent/codex.go#L39-L63"
-            >
-              <div>
-                <strong>源码：Codex 接入</strong
-                ><small>自定义 provider 和保留 ChatGPT 登录的两种接法</small>
-              </div>
-              <b>↗</b>
-            </a>
-            <a
-              id="ref-claude-wiring"
-              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/agent/claude.go#L23-L33"
-            >
-              <div>
-                <strong>源码：Claude Code 接入</strong
-                ><small>基础地址、凭据与模型配置项</small>
-              </div>
-              <b>↗</b>
-            </a>
-            <a
-              id="ref-entry-auth"
-              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/lan.go#L551-L556"
-            >
-              <div>
-                <strong>源码：入口鉴权</strong
-                ><small>普通回环与共享入口的接收规则</small>
-              </div>
-              <b>↗</b>
-            </a>
-            <a
-              id="ref-claude-bridge"
-              href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/docs/subsystems/claude-subscription-bridge.md"
-            >
-              <div>
-                <strong>Claude 订阅桥接</strong
-                ><small>本地 Claude Code 进程与订阅请求</small>
-              </div>
-              <b>↗</b>
-            </a>
-          </div>
-          <a href="sources.md" class="sources-more">完整来源与实现对照 →</a>
+          <details class="arch-detail">
+            <summary>查看配置、路由和协议源码</summary>
+            <div class="source-links">
+              <a
+                href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/README.zh-CN.md"
+                ><div>
+                  <strong>先看：项目官方介绍</strong
+                  ><small>整体架构、支持的协议与路由模式</small>
+                </div>
+                <b>↗</b></a
+              ><a
+                id="ref-wiring"
+                href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/docs/subsystems/agent-wiring.md"
+                ><div>
+                  <strong>接入：Agent wiring</strong
+                  ><small>如何修改、记录和恢复 Agent 配置</small>
+                </div>
+                <b>↗</b></a
+              ><a
+                id="ref-routing"
+                href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/docs/subsystems/gateway-routing.md"
+                ><div>
+                  <strong>深入：Gateway routing</strong
+                  ><small>请求路由、候选选择和故障行为</small>
+                </div>
+                <b>↗</b></a
+              ><a
+                id="ref-ir"
+                href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/ir.go"
+                ><div>
+                  <strong>源码：统一内部结构</strong
+                  ><small>Request、Part 和流式 Event 的表示</small>
+                </div>
+                <b>↗</b></a
+              >
+              <a
+                id="ref-providers"
+                href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/docs/subsystems/providers-accounts.md"
+              >
+                <div>
+                  <strong>供应商与账号</strong
+                  ><small>自定义地址、模型列表、协议与凭据</small>
+                </div>
+                <b>↗</b>
+              </a>
+              <a
+                id="ref-caller"
+                href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/gateway.go#L55-L84"
+              >
+                <div>
+                  <strong>源码：识别调用方</strong
+                  ><small>agentOf 如何解析请求来源</small>
+                </div>
+                <b>↗</b>
+              </a>
+              <a
+                id="ref-codex-wiring"
+                href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/agent/codex.go#L39-L63"
+              >
+                <div>
+                  <strong>源码：Codex 接入</strong
+                  ><small>自定义 provider 和保留 ChatGPT 登录的两种接法</small>
+                </div>
+                <b>↗</b>
+              </a>
+              <a
+                id="ref-claude-wiring"
+                href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/agent/claude.go#L23-L33"
+              >
+                <div>
+                  <strong>源码：Claude Code 接入</strong
+                  ><small>基础地址、凭据与模型配置项</small>
+                </div>
+                <b>↗</b>
+              </a>
+              <a
+                id="ref-entry-auth"
+                href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/internal/gateway/lan.go#L551-L556"
+              >
+                <div>
+                  <strong>源码：入口鉴权</strong
+                  ><small>普通回环与共享入口的接收规则</small>
+                </div>
+                <b>↗</b>
+              </a>
+              <a
+                id="ref-claude-bridge"
+                href="https://github.com/yetone/magpie/blob/9314999a4a771eccda4888d3fa7cde84e8bef855/docs/subsystems/claude-subscription-bridge.md"
+              >
+                <div>
+                  <strong>Claude 订阅桥接</strong
+                  ><small>本地 Claude Code 进程与订阅请求</small>
+                </div>
+                <b>↗</b>
+              </a>
+            </div>
+            <a href="sources.md" class="sources-more">完整来源与实现对照</a>
+          </details>
         </section>
         <footer class="article-footer">
           <a href="../../">← 返回主题目录</a>

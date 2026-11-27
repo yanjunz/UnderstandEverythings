@@ -366,6 +366,7 @@
     });
   });
   showProtocol("claude");
+  $(".translation-experiment").hidden = false;
 
   let routeTimer;
   const exhausted = $("#primary-exhausted");
@@ -427,6 +428,8 @@
       }, 700);
     }, 700);
   });
+
+  $(".routing-experiment").hidden = false;
 
   const answers = [1, 2, 1];
   const explanations = [

@@ -7,6 +7,7 @@
   <title>grill-me Skill 原理 · 理解万物</title>
   <link rel="stylesheet" href="../../assets/flow-motion.css">
   <link rel="stylesheet" href="assets/topic.css">
+  <link rel="stylesheet" href="../../assets/architecture.css">
   <script defer src="../../assets/perspectives.js"></script>
   <script defer src="assets/demo.js"></script>
   <script defer src="../../assets/pageviews.js"></script>
@@ -19,7 +20,7 @@
       <nav aria-label="页内导航">
         <a href="#system-architecture">架构图</a>
         <a href="#interview-demo">交互演示</a>
-        <a href="#perspectives">讲解视角</a>
+        <a href="#architect">架构师速览</a>
         <a href="#references">参考资料</a>
       </nav>
     </div>
@@ -147,31 +148,97 @@
         </div>
       </section>
 
-      <section id="architect" class="perspective-panel" aria-labelledby="architect-title">
-        <h3 id="architect-title">把问答看成逐轮解依赖</h3>
-        <p>上游由入口和可复用访谈规则组成。入口 <code>grill-me/SKILL.md</code> 用 <code>disable-model-invocation: true</code> 标明用户触发，并要求通过 <code>Skill</code> 工具加载 <code>grilling</code>。只装入口时，共用访谈 Skill 仍需由宿主发现和加载。<sup><a href="#ref-entry" aria-label="来源 1">[1]</a></sup><sup><a href="#ref-loop-doc" aria-label="来源 3">[3]</a></sup></p>
-        <dl class="design-list">
-          <div>
-            <dt>前沿由已确认的前置条件决定</dt>
-            <dd>一轮收集所有当前适用且依赖已满足的决定。若补位方式仍未选，保留多久就属于后续轮次，即使「开放候补」已经确定。上游叫它设计树。读书会示例的补位方式同时依赖一个用户决定和一个工具事实，架构上可把它理解为带条件的依赖关系。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></dd>
+      <section id="architect" class="perspective-panel grill-architect" aria-labelledby="architect-title">
+        <h3 id="architect-title">grill-me 怎样决定这一轮问什么？</h3>
+        <p>主 Agent 每轮挑出前提已满足的问题，这一组称为<strong>提问前沿</strong>。用户决定做什么，子 Agent 查证现有系统能做什么。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></p>
+
+        <figure class="arch-overview grill-arch-dependencies" id="grill-dependencies" aria-labelledby="grill-dependencies-title">
+          <figcaption>
+            <h4 id="grill-dependencies-title">读书会报名的两条依赖分支</h4>
+          </figcaption>
+          <div class="grill-arch-stage">
+            <strong>组织者 → 主 Agent</strong>
+            <span>首轮选择开放候补，由组织者手动发送活动提醒。</span>
           </div>
-          <div>
-            <dt>查询事实和作决定是两条路径</dt>
-            <dd>上游要求派子 Agent 在新的上下文中查证事实。示例只查取消报名释放名额时，系统是否已发出可触发候补补位的事件。结果未返回时，补位方式和下游等待，手动提醒的时间仍可决定。缺少名额释放事件意味着自动补位需要加开发工作，是否扩大本期范围仍由用户决定。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></dd>
+          <p class="grill-arch-arrow"><span aria-hidden="true">↓</span> 两条分支可并行处理</p>
+          <div class="grill-arch-branches">
+            <section class="grill-arch-branch" aria-labelledby="grill-reminder-title">
+              <h5 id="grill-reminder-title">手动提醒</h5>
+              <p class="grill-arch-step"><strong>现在就问</strong>提前多久发提醒？</p>
+            </section>
+            <section class="grill-arch-branch" aria-labelledby="grill-queue-title">
+              <h5 id="grill-queue-title">候补补位</h5>
+              <p class="grill-arch-step"><strong>先查仓库</strong>是否已有名额释放事件？</p>
+              <p class="grill-arch-step"><strong>查到结果再问</strong>自动还是手动补位？</p>
+              <p class="grill-arch-step"><strong>选自动再问</strong>给下一位保留多久？</p>
+            </section>
           </div>
-          <div>
-            <dt>建议的措辞让决定可确认、可反驳</dt>
-            <dd>每个问题有编号、题目和建议。源码规定把问句写成回答「是」就接受建议的形式，例如缺少名额释放事件时问「本期由组织者手动补位吗？」。用户仍可以选择新增自动化。回答会更新假设。发现一项决定依赖了错误前提时，应重新打开受影响的分支。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-loop-doc" aria-label="来源 3">[3]</a></sup></dd>
+          <p class="grill-arch-arrow"><span aria-hidden="true">↓</span> 答复和查证结果分别回传</p>
+          <div class="grill-arch-stage">
+            <strong>主 Agent 重算提问前沿</strong>
+            <span>有可答问题就继续问。只缺必要事实时等待，分支全部解决后请组织者确认方案。</span>
           </div>
-          <div>
-            <dt>暂时问不了与已结束需要区分</dt>
-            <dd>调查未完成时，可能暂时没有能问的问题，但相关分支仍未解决。分支全部处理后才进入共识确认。确认属于提示词规定的行为，宿主和模型的能力会影响执行效果。作者文档指出，前沿由模型判断，有时会漏掉题目间的依赖。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-loop-doc" aria-label="来源 3">[3]</a></sup></dd>
-          </div>
-        </dl>
-        <div class="callout">
-          <h4>落盘由哪个 Skill 负责？</h4>
-          <p><code>grill-me</code> 的共享理解留在对话中。需要把领域词汇和架构决定留给项目后续使用时，<code>grill-with-docs</code> 会同时调用 <code>grilling</code> 和 <code>domain-modeling</code>，维护 <code>GLOSSARY.md</code> 和 ADR（架构决策记录）。<sup><a href="#ref-guide" aria-label="来源 4">[4]</a></sup><sup><a href="#ref-docs-variant" aria-label="来源 6">[6]</a></sup></p>
-        </div>
+          <p class="grill-arch-caption">本图采用固定示例。首轮选择「满额即关闭」会跳过候补整支。<a href="#interview-demo">试试这条分支</a></p>
+        </figure>
+
+        <section class="grill-arch-section" aria-labelledby="grill-boundary-title">
+          <h4 id="grill-boundary-title">角色与系统边界</h4>
+          <table class="arch-table" aria-labelledby="grill-boundary-title">
+            <thead>
+              <tr><th scope="col">角色</th><th scope="col">输入</th><th scope="col">输出</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">宿主</th><td>用户调用 <code>/grill-me</code></td><td>通过 Skill 工具加载 <code>grilling</code><sup><a href="#ref-entry" aria-label="来源 1">[1]</a></sup></td></tr>
+              <tr><th scope="row">主 Agent</th><td>草案、已确认的决定、已查证的事实</td><td>本轮问题及建议，最后请求确认共识<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></td></tr>
+              <tr><th scope="row">子 Agent</th><td>主 Agent 派发的环境查证</td><td>名额释放事件是否已存在<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></td></tr>
+              <tr><th scope="row">组织者</th><td>问题、建议与待确认的方案</td><td>补位方式等产品决定和最终确认<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="grill-arch-section" aria-labelledby="grill-tradeoff-title">
+          <h4 id="grill-tradeoff-title">分轮提问的取舍</h4>
+          <dl class="grill-arch-tradeoffs">
+            <div><dt>减少对话轮次</dt><dd>互不依赖的问题可以成批回答。仓库调查期间，手动提醒这条支路仍能推进。</dd></div>
+            <div><dt>依赖模型判断</dt><dd>上游用提示词约束前沿和确认时机。模型漏判依赖时，受影响的分支要重新打开。<sup><a href="#ref-loop-doc" aria-label="来源 3">[3]</a></sup></dd></div>
+          </dl>
+        </section>
+
+        <details class="arch-detail" id="grill-diagnosis">
+          <summary>失效与诊断</summary>
+          <dl class="design-list">
+            <div>
+              <dt>同时问怎么补位和保留多久</dt>
+              <dd>检查两问间的依赖。保留时长只在自动补位时适用。把它放回后续轮次，保留已确认且无关的提醒决定。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-loop-doc" aria-label="来源 3">[3]</a></sup></dd>
+            </div>
+            <div>
+              <dt>查不到名额释放事件</dt>
+              <dd>区分「调查还没完成」和「已证实事件不存在」。前者继续等事实，后者可以建议「本期由组织者手动补位吗？」。用户仍可决定增加自动化开发。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></dd>
+            </div>
+            <div>
+              <dt>暂时没问题就开始实施</dt>
+              <dd>先检查是否有待查事实卡住下游。适用分支都解决后，还要取得用户的共识确认。宿主与模型的能力会影响规则是否得到执行。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup><sup><a href="#ref-loop-doc" aria-label="来源 3">[3]</a></sup></dd>
+            </div>
+          </dl>
+        </details>
+
+        <details class="arch-detail" id="grill-source">
+          <summary>上游实现与输出边界</summary>
+          <dl class="design-list">
+            <div>
+              <dt><code>grill-me/SKILL.md</code></dt>
+              <dd>入口用 <code>disable-model-invocation: true</code> 标明由用户触发，正文要求 Agent 用宿主的 Skill 工具加载 <code>grilling</code>。入口和访谈 Skill 都需要能被宿主发现。<sup><a href="#ref-entry" aria-label="来源 1">[1]</a></sup><sup><a href="#ref-loop-doc" aria-label="来源 3">[3]</a></sup></dd>
+            </div>
+            <div>
+              <dt><code>grilling/SKILL.md</code></dt>
+              <dd>每轮收集全部可问题目，每问附编号与建议，问句要让回答「是」表示接受建议。可查证的环境事实交给使用新上下文的子 Agent。仍有独立问题时先问这些。<sup><a href="#ref-loop" aria-label="来源 2">[2]</a></sup></dd>
+            </div>
+            <div>
+              <dt><code>grill-with-docs/SKILL.md</code></dt>
+              <dd><code>grill-me</code> 的共识留在对话中。若要在仓库维护领域资料，<code>grill-with-docs</code> 会加载同一访谈 Skill 和 <code>domain-modeling</code>。术语进入 <code>GLOSSARY.md</code>。难逆转、缺少背景时会令人困惑且确有取舍的决定，才写成 ADR（架构决策记录）。<sup><a href="#ref-guide" aria-label="来源 4">[4]</a></sup><sup><a href="#ref-docs-variant" aria-label="来源 6">[6]</a></sup></dd>
+            </div>
+          </dl>
+        </details>
       </section>
     </section>
 

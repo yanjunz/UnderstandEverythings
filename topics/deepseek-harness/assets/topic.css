@@ -571,19 +571,8 @@ section[id] { scroll-margin-top: 1.5rem; }
 .beginner-steps li::marker { color: var(--accent-dark); font-weight: 700; }
 .beginner-steps span { display: block; color: var(--muted); }
 .beginner-example { max-width: 54rem; margin-top: 1.4rem; }
-.beginner-example p, .trace-example pre + p { margin-top: .65rem; color: var(--muted); }
-.mechanism-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-top: 1.35rem; }
-
-.mechanism {
-  padding: 1.25rem;
-  border: 1px solid var(--line);
-  border-radius: .75rem;
-  background: var(--paper);
-}
-
-.package-name { margin-bottom: .65rem; color: var(--accent-dark); font: 650 .83rem/1.4 var(--mono); }
-.mechanism h4 + p, .plugin-note > p, .trace-example h4 + p { margin-top: .55rem; color: var(--muted); }
-.mechanism code, .architecture-notes code { overflow-wrap: anywhere; }
+.beginner-example p { margin-top: .65rem; color: var(--muted); }
+.plugin-note > p { margin-top: .55rem; color: var(--muted); }
 
 .plugin-note {
   max-width: 54rem;
@@ -594,9 +583,12 @@ section[id] { scroll-margin-top: 1.5rem; }
   background: var(--accent-pale);
 }
 
-.trace-example, .architecture-notes { margin-top: 1.45rem; }
-.trace-example pre {
-  margin: .7rem 0 0;
+.dsh-flow-layer { margin: .8rem 0 .4rem; color: var(--accent-dark); font-size: .9rem; }
+.dsh-flow-route { margin-top: .45rem; color: var(--muted); font-size: .9rem; }
+.dsh-flow-route > span { margin-right: .25em; color: var(--accent-dark); font-weight: 700; }
+
+.dsh-arch-trace {
+  margin: .7rem 0;
   padding: .85rem 1rem;
   border-radius: .65rem;
   background: var(--night);
@@ -606,11 +598,6 @@ section[id] { scroll-margin-top: 1.5rem; }
   overflow-wrap: anywhere;
 }
 
-.architecture-notes { max-width: 54rem; scroll-margin-top: 1.5rem; }
-.architecture-notes dl { margin: .55rem 0 0; }
-.architecture-notes dt { font-weight: 700; }
-.architecture-notes dd { margin: 0 0 .65rem; color: var(--muted); }
-#design-details dd { margin: .2rem 0 1rem; }
 .references { margin: 1.1rem 0 0; padding-inline-start: 1.45rem; }
 .references li + li { margin-top: .65rem; }
 .references li::marker { color: var(--accent-dark); }
@@ -625,10 +612,6 @@ section[id] { scroll-margin-top: 1.5rem; }
 @media (max-width: 52rem) {
   .hero { grid-template-columns: 1fr; }
   .hero h1 { font-size: clamp(2.55rem, 9.5vw, 4.5rem); }
-}
-
-@media (max-width: 48rem) {
-  .mechanism-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 39rem) {

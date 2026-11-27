@@ -14,9 +14,17 @@ function activatePerspective(selectedIndex) {
   perspectiveList.dispatchEvent(new Event("perspectivechange"));
 }
 
-function perspectiveFromLocation() {
-  const target = document.getElementById(location.hash.slice(1));
-  return perspectivePanels.findIndex((panel) => panel.contains(target));
+function revealFragment(hash) {
+  const target = document.getElementById(hash.slice(1));
+  if (!target) return null;
+  const index = perspectivePanels.findIndex((panel) => panel.contains(target));
+  if (index !== -1 && perspectiveTabs[index].getAttribute("aria-selected") !== "true") {
+    activatePerspective(index);
+  }
+  for (let detail = target.closest("details"); detail; detail = detail.parentElement.closest("details")) {
+    detail.open = true;
+  }
+  return target;
 }
 
 function selectPerspective(index) {
@@ -61,11 +69,16 @@ perspectiveList.addEventListener("keydown", (event) => {
   perspectiveTabs[next].focus();
 });
 
-activatePerspective(Math.max(0, perspectiveFromLocation()));
-window.addEventListener("hashchange", () => {
-  const index = perspectiveFromLocation();
-  if (index === -1 || !perspectivePanels[index].hidden) return;
+activatePerspective(0);
+revealFragment(location.hash);
 
-  activatePerspective(index);
-  document.getElementById(location.hash.slice(1)).scrollIntoView();
+// Reveal the destination before the browser moves focus and scrolls to the fragment.
+document.addEventListener("click", (event) => {
+  if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const link = event.target.closest("a[href^='#']");
+  if (link) revealFragment(link.hash);
+});
+
+window.addEventListener("hashchange", () => {
+  revealFragment(location.hash)?.scrollIntoView({ behavior: "instant" });
 });

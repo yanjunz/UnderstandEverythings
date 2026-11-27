@@ -186,15 +186,14 @@ sup { margin-inline-start: .2em; font: 650 .75rem/0 var(--mono); }
 .perspective-choices span { color: var(--muted); font-size: .875rem; }
 .perspective-panel, .questions { max-width: 55rem; margin-top: 1.35rem; }
 .perspective-panel > p { margin-top: .65rem; color: var(--muted); }
+.arch-detail-body > p + p { margin-top: .55rem; }
 .checklist, .references { padding-inline-start: 1.5rem; }
 .checklist li + li, .references li + li { margin-top: .5rem; }
 .checklist li::marker, .references li::marker { color: var(--accent-dark); font-weight: 700; }
 .callout { margin-top: 1.25rem; padding: .8rem 1rem; border-left: 3px solid var(--accent); background: var(--accent-pale); }
 .callout p { margin-top: .35rem; color: var(--muted); }
-.design-list { margin: 1rem 0 1.3rem; }
-.design-list > div { padding: .65rem 0; border-bottom: 1px solid var(--line); }
-.design-list dt, .questions dt { font-weight: 700; }
-.design-list dd, .questions dd { margin: .25rem 0 .6rem; color: var(--muted); }
+.questions dt { font-weight: 700; }
+.questions dd { margin: .25rem 0 .6rem; color: var(--muted); }
 .references li:target { background: var(--accent-pale); }
 .site-footer { border-top: 1px solid var(--line); }
 .site-footer p { color: var(--muted); font-size: .9rem; }
